@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 export const maxDuration = 15;
 import { getSession } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
-import { getMemberValuation, getMemberHistory } from "@/lib/valuation";
+import { getMemberValuation, getMemberHistory, getPortfolioGains } from "@/lib/valuation";
 
 // GET /api/me — everything the logged-in member needs
 export async function GET() {
@@ -22,6 +22,9 @@ export async function GET() {
 
   // Real-time valuation
   const valuation = await getMemberValuation(session.id);
+
+  // Daily/weekly portfolio gains (club-level, scaled by member ownership)
+  const clubGains = await getPortfolioGains();
 
   // Valuation history (for chart)
   const history = await getMemberHistory(session.id);
@@ -122,10 +125,28 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(5);
 
+  // Scale club gains by member ownership % for member-level daily/weekly
+  const ownershipFraction = valuation?.ownership_pct ? valuation.ownership_pct / 100 : 0;
+  const memberGains = {
+    daily: clubGains.daily ? {
+      gain: Math.round(clubGains.daily.gain * ownershipFraction * 100) / 100,
+      pct: Math.round(clubGains.daily.pct * 100) / 100,
+    } : null,
+    weekly: clubGains.weekly ? {
+      gain: Math.round(clubGains.weekly.gain * ownershipFraction * 100) / 100,
+      pct: Math.round(clubGains.weekly.pct * 100) / 100,
+    } : null,
+  };
+
   return NextResponse.json({
     member,
     valuation,
     history,
+    gains: memberGains,
+    club_gains: {
+      daily: clubGains.daily ? { gain: Math.round(clubGains.daily.gain), pct: Math.round(clubGains.daily.pct * 100) / 100 } : null,
+      weekly: clubGains.weekly ? { gain: Math.round(clubGains.weekly.gain), pct: Math.round(clubGains.weekly.pct * 100) / 100 } : null,
+    },
     contributions: contributions || [],
     fines: fines || [],
     unpaid_fines: unpaidFines,

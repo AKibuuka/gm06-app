@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 export const maxDuration = 15;
 import { getSession } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
+import { getPortfolioGains } from "@/lib/valuation";
 
 export async function GET() {
   const session = await getSession();
@@ -41,5 +42,14 @@ export async function GET() {
     return latest;
   }, null);
 
-  return NextResponse.json({ summary, totalValue, totalCost, investments, history: history || [], last_updated: lastUpdated });
+  // Daily/weekly gains
+  const gains = await getPortfolioGains();
+
+  return NextResponse.json({
+    summary, totalValue, totalCost, investments, history: history || [], last_updated: lastUpdated,
+    gains: {
+      daily: gains.daily ? { gain: Math.round(gains.daily.gain), pct: Math.round(gains.daily.pct * 100) / 100 } : null,
+      weekly: gains.weekly ? { gain: Math.round(gains.weekly.gain), pct: Math.round(gains.weekly.pct * 100) / 100 } : null,
+    },
+  });
 }

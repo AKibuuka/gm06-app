@@ -37,7 +37,7 @@ function MemberDashboard({ hideHeader = false }) {
     </div>
   );
 
-  const { member, valuation: v, history, contributions, unpaid_fines, club_history, active_loan, contribution_status, announcements } = data;
+  const { member, valuation: v, history, contributions, unpaid_fines, club_history, active_loan, contribution_status, announcements, gains, club_gains } = data;
   const segments = ((v && v.allocation) || []).filter((a) => a.pct > 0).map((a) => ({
     label: ASSET_CLASS_LABELS[a.asset_class] || a.asset_class, pct: a.pct, color: ASSET_CLASS_COLORS[a.asset_class] || "#666", value: a.member_value, clubValue: a.club_value,
   }));
@@ -160,9 +160,9 @@ function MemberDashboard({ hideHeader = false }) {
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
             <StatCard label="Total Invested" value={fmtUGX(v.total_invested)} />
+            <StatCard label="Today" value={gains?.daily ? `${gains.daily.gain >= 0 ? "+" : ""}${fmtShort(gains.daily.gain)}` : "—"} sub={gains?.daily ? `${gains.daily.pct >= 0 ? "+" : ""}${gains.daily.pct}%` : "No price data"} color={!gains?.daily ? "#6B7280" : gains.daily.gain >= 0 ? "#22C55E" : "#EF4444"} />
+            <StatCard label="This Week" value={gains?.weekly ? `${gains.weekly.gain >= 0 ? "+" : ""}${fmtShort(gains.weekly.gain)}` : "—"} sub={gains?.weekly ? `${gains.weekly.pct >= 0 ? "+" : ""}${gains.weekly.pct}%` : "No price data"} color={!gains?.weekly ? "#6B7280" : gains.weekly.gain >= 0 ? "#22C55E" : "#EF4444"} />
             <StatCard label="This Month" value={monthGain !== null ? `${monthGain >= 0 ? "+" : ""}${fmtShort(monthGain)}` : "—"} sub={monthPct !== null ? `${monthPct >= 0 ? "+" : ""}${monthPct}%` : "No prior month"} color={monthGain === null ? "#6B7280" : monthGain >= 0 ? "#22C55E" : "#EF4444"} />
-            <StatCard label="This Year" value={ytdGain !== null ? `${ytdGain >= 0 ? "+" : ""}${fmtShort(ytdGain)}` : "—"} sub={ytdPct !== null ? `${ytdPct >= 0 ? "+" : ""}${ytdPct}% YTD` : "No prior year"} color={ytdGain === null ? "#6B7280" : ytdGain >= 0 ? "#22C55E" : "#EF4444"} />
-            <StatCard label="Status" value={v.advance_contribution >= 0 ? "Current" : "Behind"} sub={`${v.advance_contribution >= 0 ? "+" : ""}${fmtShort(v.advance_contribution)}`} color={v.advance_contribution >= 0 ? "#22C55E" : "#EF4444"} />
           </div>
 
           {/* Chart + Allocation */}
@@ -281,6 +281,13 @@ function MemberDashboard({ hideHeader = false }) {
             <div className="text-xs text-gray-500 mt-1">Your share: <span className="font-mono text-white">{v.ownership_pct}%</span> = <span className="font-mono text-brand-500">{fmtUGX(v.portfolio_value)}</span></div>
           </div>
 
+          {/* Club Daily/Weekly */}
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            <StatCard label="Club Today" value={club_gains?.daily ? `${club_gains.daily.gain >= 0 ? "+" : ""}${fmtShort(club_gains.daily.gain)}` : "—"} sub={club_gains?.daily ? `${club_gains.daily.pct >= 0 ? "+" : ""}${club_gains.daily.pct}%` : "No price data"} color={!club_gains?.daily ? "#6B7280" : club_gains.daily.gain >= 0 ? "#22C55E" : "#EF4444"} />
+            <StatCard label="Club This Week" value={club_gains?.weekly ? `${club_gains.weekly.gain >= 0 ? "+" : ""}${fmtShort(club_gains.weekly.gain)}` : "—"} sub={club_gains?.weekly ? `${club_gains.weekly.pct >= 0 ? "+" : ""}${club_gains.weekly.pct}%` : "No price data"} color={!club_gains?.weekly ? "#6B7280" : club_gains.weekly.gain >= 0 ? "#22C55E" : "#EF4444"} />
+            <StatCard label="Club All-Time" value={fmtUGX(clubTotal - (clubHist[0]?.total_invested || 0))} sub="Since inception" color="#14B8A6" />
+          </div>
+
           {/* Club Chart + Allocation */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
             <div className="lg:col-span-3 card">
@@ -357,6 +364,7 @@ function AdminDashboard() {
   const totalValue = portfolio?.totalValue || 0;
   const history = portfolio?.history || [];
   const summary = portfolio?.summary || {};
+  const clubGains = portfolio?.gains || {};
   const totalInvested = members.reduce((s, m) => s + (m.snapshot?.total_invested || 0), 0);
   const totalGain = totalValue - totalInvested;
   const returnPct = totalInvested > 0 ? ((totalGain / totalInvested) * 100).toFixed(1) : 0;
@@ -396,11 +404,15 @@ function AdminDashboard() {
         <a href="/admin" className="bg-surface-1 hover:bg-surface-2 border border-surface-3 text-sm text-gray-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"><PieChart size={14} className="text-purple-400" />Manage Investments</a>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <StatCard label="Portfolio Value" value={fmtUGX(totalValue)} sub={`${returnPct >= 0 ? "+" : ""}${returnPct}% return`} color="#22C55E" />
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+        <StatCard label="Portfolio Value" value={fmtUGX(totalValue)} sub={`${returnPct >= 0 ? "+" : ""}${returnPct}% all-time`} color="#22C55E" />
         <StatCard label="Total Invested" value={fmtUGX(totalInvested)} sub={`${members.length} members`} color="#3B82F6" />
-        <StatCard label="Total Gain" value={fmtUGX(totalGain)} sub="Since inception" color="#14B8A6" />
         <StatCard label="Arrears" value={fmtUGX(Math.abs(totalArrears))} sub={`${arrearsMembers.length} members behind`} color="#EF4444" />
+      </div>
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <StatCard label="Today" value={clubGains.daily ? `${clubGains.daily.gain >= 0 ? "+" : ""}${fmtShort(clubGains.daily.gain)}` : "—"} sub={clubGains.daily ? `${clubGains.daily.pct >= 0 ? "+" : ""}${clubGains.daily.pct}%` : "No price data"} color={!clubGains.daily ? "#6B7280" : clubGains.daily.gain >= 0 ? "#22C55E" : "#EF4444"} />
+        <StatCard label="This Week" value={clubGains.weekly ? `${clubGains.weekly.gain >= 0 ? "+" : ""}${fmtShort(clubGains.weekly.gain)}` : "—"} sub={clubGains.weekly ? `${clubGains.weekly.pct >= 0 ? "+" : ""}${clubGains.weekly.pct}%` : "No price data"} color={!clubGains.weekly ? "#6B7280" : clubGains.weekly.gain >= 0 ? "#22C55E" : "#EF4444"} />
+        <StatCard label="All-Time Gain" value={fmtUGX(totalGain)} sub="Since inception" color={totalGain >= 0 ? "#14B8A6" : "#EF4444"} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
