@@ -5,6 +5,8 @@ import { useToast } from "@/components/Toast";
 import { Plus, DollarSign, ArrowDown, ArrowUp, AlertTriangle } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import { fmtUGX, fmtShort, fmtDate } from "@/lib/format";
+import useTitle from "@/lib/useTitle";
+import { SkeletonPage } from "@/components/Skeleton";
 
 const TYPE_STYLES = {
   deposit: { bg: "bg-green-900/20 text-green-400", icon: ArrowDown },
@@ -16,6 +18,7 @@ const TYPE_STYLES = {
 export default function ContributionsPage() {
   const user = useUser();
   const toast = useToast();
+  useTitle("Contributions");
   const isAdmin = user?.role === "admin";
 
   const [contributions, setContributions] = useState([]);
@@ -78,7 +81,7 @@ export default function ContributionsPage() {
     setShowBatch(false); setBatchAmounts({}); setBatchRefs({}); setSubmitting(false);
   }
 
-  if (loading) return <div className="text-gray-500 text-sm p-8">Loading...</div>;
+  if (loading) return <SkeletonPage cards={3} rows={6} />;
 
   return (
     <div className="animate-in">

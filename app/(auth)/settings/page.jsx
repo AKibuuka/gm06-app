@@ -4,10 +4,12 @@ import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { Lock, User, Globe, Save, Shield, Copy, Eye, EyeOff } from "lucide-react";
 import { FormField, inputClass, btnPrimary, btnSecondary } from "@/components/Modal";
+import useTitle from "@/lib/useTitle";
 
 export default function SettingsPage() {
   const user = useUser();
   const toast = useToast();
+  useTitle("Settings");
 
   // Password
   const [currentPwd, setCurrentPwd] = useState("");

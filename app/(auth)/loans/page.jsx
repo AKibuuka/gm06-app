@@ -5,6 +5,8 @@ import { useToast } from "@/components/Toast";
 import { Landmark, Plus, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import Modal, { FormField, inputClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import { fmtUGX, fmtShort, fmtDate } from "@/lib/format";
+import useTitle from "@/lib/useTitle";
+import { SkeletonPage } from "@/components/Skeleton";
 
 const STATUS_STYLES = {
   pending: { bg: "bg-amber-900/20 text-amber-400", label: "Pending Approval" },
@@ -23,6 +25,7 @@ export default function LoansPage() {
   const [showRequest, setShowRequest] = useState(false);
   const [form, setForm] = useState({ amount: "", reason: "" });
   const [submitting, setSubmitting] = useState(false);
+  useTitle("Loans");
 
   useEffect(() => {
     Promise.all([
@@ -72,7 +75,7 @@ export default function LoansPage() {
     } catch (e) { toast?.(e.message, "error"); }
   }
 
-  if (loading) return <div className="text-gray-500 text-sm p-8">Loading...</div>;
+  if (loading) return <SkeletonPage cards={4} rows={3} />;
 
   return (
     <div className="animate-in">

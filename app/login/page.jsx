@@ -1,13 +1,15 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const expired = searchParams.get("expired");
 
   // If already logged in, redirect
   useEffect(() => {
@@ -49,6 +51,10 @@ export default function LoginPage() {
           <p className="text-sm text-gray-500 mt-1">Investment Club Portal</p>
         </div>
 
+        {expired && (
+          <div className="bg-amber-900/20 border border-amber-800/30 text-amber-400 text-sm rounded-xl px-4 py-3 mb-4 text-center">Your session expired. Please sign in again.</div>
+        )}
+
         <form onSubmit={handleSubmit} className="bg-surface-1 border border-surface-3 rounded-2xl p-6 space-y-4">
           {error && (
             <div className="bg-red-900/20 border border-red-800/30 text-red-400 text-sm rounded-lg px-4 py-2.5">{error}</div>
@@ -71,5 +77,13 @@ export default function LoginPage() {
         <p className="text-center text-[11px] text-gray-600 mt-6">Contact the Treasurer if you need access</p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ background: "#0C1117" }}><span className="text-gray-500 text-sm">Loading...</span></div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

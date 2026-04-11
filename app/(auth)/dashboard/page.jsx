@@ -6,8 +6,10 @@ import { StatCard, DonutChart, Sparkline } from "@/components/Charts";
 import { fmtUGX, fmtShort, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
 import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Landmark, Wallet, BarChart3, MessageSquare } from "lucide-react";
 import { CLUB_SHORT } from "@/lib/constants";
+import useTitle from "@/lib/useTitle";
 
 function MemberDashboard({ hideHeader = false }) {
+  useTitle("Dashboard");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

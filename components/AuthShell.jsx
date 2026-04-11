@@ -1,5 +1,6 @@
 "use client";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import { ToastProvider } from "./Toast";
 import { Menu, X } from "lucide-react";
@@ -10,6 +11,21 @@ export const useUser = () => useContext(UserContext);
 
 export default function AuthShell({ user, children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const router = useRouter();
+
+  // Session expiry check — verify session is still valid every 5 minutes
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const res = await fetch("/api/messages/unread");
+        if (res.status === 401) {
+          router.push("/login?expired=1");
+        }
+      } catch {}
+    };
+    const interval = setInterval(checkSession, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [router]);
 
   return (
     <UserContext.Provider value={user}>

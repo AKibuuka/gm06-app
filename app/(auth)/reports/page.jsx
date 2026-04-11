@@ -5,6 +5,7 @@ import { useToast } from "@/components/Toast";
 import { FileText, Users, AlertTriangle, Download, Eye, Printer, FileSpreadsheet } from "lucide-react";
 import { fmtUGX, fmtShort, ASSET_CLASS_LABELS } from "@/lib/format";
 import { CLUB_NAME } from "@/lib/constants";
+import useTitle from "@/lib/useTitle";
 
 export default function ReportsPage() {
   const user = useUser();
@@ -12,6 +13,7 @@ export default function ReportsPage() {
   const [myData, setMyData] = useState(null);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  useTitle("Reports");
 
   useEffect(() => {
     if (user?.role === "admin") {

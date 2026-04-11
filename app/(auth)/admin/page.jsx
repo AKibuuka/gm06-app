@@ -5,7 +5,9 @@ import { useToast } from "@/components/Toast";
 import { useRouter } from "next/navigation";
 import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark, Megaphone, Trash2 } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
+import Confirm from "@/components/Confirm";
 import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS } from "@/lib/format";
+import useTitle from "@/lib/useTitle";
 
 const TABS = [
   { id: "valuation", label: "Valuation", icon: Calculator },
@@ -22,6 +24,7 @@ export default function AdminPage() {
   const router = useRouter();
   const toast = useToast();
 
+  useTitle("Admin Panel");
   useEffect(() => { if (user && user.role !== "admin") router.replace("/dashboard"); }, [user, router]);
 
   const [tab, setTab] = useState("valuation");
@@ -49,6 +52,7 @@ export default function AdminPage() {
   const [resetForm, setResetForm] = useState({ member_id: "", new_password: "" });
   const [announceForm, setAnnounceForm] = useState({ title: "", body: "", pinned: false });
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
+  const [confirm, setConfirm] = useState(null); // { title, message, onConfirm, danger }
   const [valDate, setValDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; });
   const [valResult, setValResult] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -191,6 +195,8 @@ export default function AdminPage() {
 
   return (
     <div className="animate-in">
+      <Confirm open={!!confirm} onClose={() => setConfirm(null)} title={confirm?.title} message={confirm?.message} onConfirm={confirm?.onConfirm || (() => {})} confirmText={confirm?.confirmText || "Confirm"} danger={confirm?.danger} />
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Admin Panel</h1>
         <p className="text-sm text-gray-500 mt-1">Manage club operations</p>
@@ -441,7 +447,7 @@ export default function AdminPage() {
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => handleLoanAction(l.id, "approve")} className={`${btnPrimary} px-4 text-xs`}>Approve</button>
-                        <button onClick={() => handleLoanAction(l.id, "reject")} className={`${btnSecondary} px-4 text-xs`}>Reject</button>
+                        <button onClick={() => setConfirm({ title: "Reject Loan", message: `Reject ${l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}'s loan request for ${fmtUGX(l.amount)}?`, onConfirm: () => handleLoanAction(l.id, "reject"), confirmText: "Reject", danger: true })} className={`${btnSecondary} px-4 text-xs`}>Reject</button>
                       </div>
                     </div>
                   ))}
@@ -541,7 +547,7 @@ export default function AdminPage() {
                           {a.author?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")} · {fmtDate(a.created_at)}
                         </div>
                       </div>
-                      <button onClick={() => deleteAnnouncement(a.id)} className="p-1.5 rounded hover:bg-red-900/20 text-gray-500 hover:text-red-400 shrink-0"><Trash2 size={14} /></button>
+                      <button onClick={() => setConfirm({ title: "Delete Announcement", message: `Delete "${a.title}"? This cannot be undone.`, onConfirm: () => deleteAnnouncement(a.id), confirmText: "Delete", danger: true })} className="p-1.5 rounded hover:bg-red-900/20 text-gray-500 hover:text-red-400 shrink-0"><Trash2 size={14} /></button>
                     </div>
                   </div>
                 ))}

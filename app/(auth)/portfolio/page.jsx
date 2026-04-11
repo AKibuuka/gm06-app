@@ -3,17 +3,20 @@ import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { DonutChart, Sparkline } from "@/components/Charts";
 import { fmtUGX, fmtShort, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
+import useTitle from "@/lib/useTitle";
+import { SkeletonPage } from "@/components/Skeleton";
 
 export default function PortfolioPage() {
   const user = useUser();
   const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
+  useTitle("Portfolio");
 
   useEffect(() => {
     fetch("/api/portfolio").then((r) => r.json()).then(setPortfolio).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-gray-500 text-sm p-8">Loading portfolio...</div>;
+  if (loading) return <SkeletonPage cards={0} rows={4} />;
   if (!portfolio) return <div className="text-gray-500 text-sm p-8">Unable to load portfolio data.</div>;
 
   const { summary, totalValue, investments, history, last_updated } = portfolio;

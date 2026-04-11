@@ -6,6 +6,8 @@ import { Search, Download, X } from "lucide-react";
 import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
 import { CLUB_NAME } from "@/lib/constants";
 import { DonutChart } from "@/components/Charts";
+import useTitle from "@/lib/useTitle";
+import { SkeletonPage } from "@/components/Skeleton";
 
 function StatementModal({ member, onClose }) {
   const [data, setData] = useState(null);
@@ -93,6 +95,7 @@ export default function MembersPage() {
   const [sortBy, setSortBy] = useState("value");
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
+  useTitle("Members");
 
   // Members (non-admin) see only their own data via /dashboard
   useEffect(() => {
@@ -112,7 +115,7 @@ export default function MembersPage() {
       return 0;
     });
 
-  if (loading) return <div className="text-gray-500 text-sm p-8">Loading members...</div>;
+  if (loading) return <SkeletonPage cards={0} rows={8} />;
 
   return (
     <div className="animate-in">

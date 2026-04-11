@@ -5,6 +5,8 @@ import { useToast } from "@/components/Toast";
 import { MessageSquare, Send, ArrowLeft, Plus } from "lucide-react";
 import Modal, { FormField, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import { fmtDate } from "@/lib/format";
+import useTitle from "@/lib/useTitle";
+import { SkeletonPage } from "@/components/Skeleton";
 
 export default function MessagesPage() {
   const user = useUser();
@@ -21,6 +23,7 @@ export default function MessagesPage() {
   const [showNew, setShowNew] = useState(false);
   const [newRecipient, setNewRecipient] = useState("");
   const bottomRef = useRef(null);
+  useTitle("Messages");
 
   useEffect(() => {
     Promise.all([
@@ -80,7 +83,7 @@ export default function MessagesPage() {
     return name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "";
   }
 
-  if (loading) return <div className="text-gray-500 text-sm p-8">Loading...</div>;
+  if (loading) return <SkeletonPage cards={0} rows={5} />;
 
   const activePartner = conversations.find((c) => c.partner_id === activeConvo) || members.find((m) => m.id === activeConvo);
   const partnerName = titleCase(activePartner?.partner_name || activePartner?.name || "");
