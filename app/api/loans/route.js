@@ -3,7 +3,7 @@ export const maxDuration = 15;
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 import { getMemberValuation } from "@/lib/valuation";
-import { calculateTotalDue } from "@/lib/loans";
+import { calculateTotalDue, calculateRemaining, getDueDate, isOverdue, calculateTotalWithInterest } from "@/lib/loans";
 
 // GET /api/loans?status=pending&member_id=xxx
 export async function GET(request) {
@@ -31,11 +31,12 @@ export async function GET(request) {
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Enrich with calculated total_due
   const enriched = (data || []).map((loan) => ({
     ...loan,
     calculated_total_due: calculateTotalDue(loan),
-    remaining: Math.max(0, calculateTotalDue(loan) - loan.amount_paid),
+    remaining: calculateRemaining(loan),
+    due_date: getDueDate(loan)?.toISOString().split("T")[0] || null,
+    is_overdue: isOverdue(loan),
   }));
 
   return NextResponse.json(enriched);
@@ -63,7 +64,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "You already have an active or pending loan" }, { status: 400 });
   }
 
-  // Get portfolio value and max percentage
+  // Get portfolio value and settings
   const valuation = await getMemberValuation(session.id);
   if (!valuation) return NextResponse.json({ error: "No portfolio data available" }, { status: 400 });
 
@@ -79,6 +80,7 @@ export async function POST(request) {
     return NextResponse.json({ error: `Maximum loan amount is ${Math.floor(maxAmount).toLocaleString()} (${maxPct}% of your portfolio)` }, { status: 400 });
   }
 
+  // total_due is set to amount only at request time — interest added at activation
   const { data: loan, error } = await db.from("loans").insert({
     member_id: session.id,
     amount: parseFloat(amount),
@@ -135,12 +137,19 @@ export async function PUT(request) {
       return NextResponse.json({ error: "You already approved this loan. A different admin must provide the second approval." }, { status: 400 });
     }
 
+    // Activate: calculate total_due with flat quarterly interest
+    const totalDue = calculateTotalWithInterest(loan.amount, loan.interest_rate);
+    const now = new Date();
+    const dueDate = new Date(now);
+    dueDate.setMonth(dueDate.getMonth() + 3);
+
     const { data, error } = await db.from("loans")
       .update({
         approved_by_2: session.id,
         status: "active",
-        approved_at: new Date().toISOString(),
-        activated_at: new Date().toISOString(),
+        total_due: totalDue,
+        approved_at: now.toISOString(),
+        activated_at: now.toISOString(),
       })
       .eq("id", id)
       .select("*")

@@ -102,9 +102,9 @@ export default function SettingsPage() {
                 <input type="number" step="1" min="0" max="100" value={settings.max_loan_pct || ""} onChange={(e) => setSettings({ ...settings, max_loan_pct: e.target.value })} className={inputClass} />
                 <p className="text-[11px] text-gray-500 mt-1">Members can borrow up to this % of their portfolio value. Current: {settings.max_loan_pct || "80"}%</p>
               </FormField>
-              <FormField label="Loan Interest Rate (% per annum)">
+              <FormField label="Loan Interest Rate (% per quarter)">
                 <input type="number" step="0.1" min="0" value={settings.loan_interest_rate || ""} onChange={(e) => setSettings({ ...settings, loan_interest_rate: e.target.value })} className={inputClass} />
-                <p className="text-[11px] text-gray-500 mt-1">Annual interest rate on active loans. Current: {settings.loan_interest_rate || "10"}%</p>
+                <p className="text-[11px] text-gray-500 mt-1">Flat interest rate for the 3-month loan period. Current: {settings.loan_interest_rate || "10"}%</p>
               </FormField>
               <button type="submit" disabled={settingsSubmitting} className={`w-full ${btnPrimary} mt-2 flex items-center justify-center gap-2`}>
                 <Save size={14} />{settingsSubmitting ? "Saving..." : "Save Settings"}

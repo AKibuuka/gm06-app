@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 export const maxDuration = 15;
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
-import { calculateTotalDue } from "@/lib/loans";
+import { calculateTotalDue, isOverdue } from "@/lib/loans";
 
 // GET /api/contributions?member_id=xxx&from=2026-01-01&to=2026-03-31
 export async function GET(request) {
@@ -87,17 +87,20 @@ export async function POST(request) {
       const currentDue = calculateTotalDue(activeLoan);
       const remaining = Math.max(0, currentDue - activeLoan.amount_paid);
       const depositAmount = parseFloat(amount);
-      const loanPayment = Math.min(depositAmount, remaining);
-      const excess = Math.round((depositAmount - loanPayment) * 100) / 100;
+      const overdue = isOverdue(activeLoan);
+
+      // If overdue, entire contribution goes to loan recovery (no excess to portfolio)
+      const loanPayment = overdue ? depositAmount : Math.min(depositAmount, remaining);
+      const excess = overdue ? 0 : Math.round((depositAmount - loanPayment) * 100) / 100;
 
       // Record loan payment
       await db.from("loan_payments").insert({
         loan_id: activeLoan.id,
         member_id,
-        amount: loanPayment,
+        amount: Math.min(loanPayment, remaining),
         source: "contribution",
         contribution_id: data.id,
-        note: `Auto-deducted from deposit of ${depositAmount}`,
+        note: overdue ? `Overdue loan recovery from deposit of ${depositAmount}` : `Auto-deducted from deposit of ${depositAmount}`,
       });
 
       // Update loan

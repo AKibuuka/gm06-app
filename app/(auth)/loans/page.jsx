@@ -100,7 +100,7 @@ export default function LoansPage() {
             <div>
               <div className="text-xs text-gray-500">Interest Rate</div>
               <div className="text-lg font-bold font-mono">{interestRate}%</div>
-              <div className="text-[11px] text-gray-500">per annum</div>
+              <div className="text-[11px] text-gray-500">per quarter (3 months)</div>
             </div>
             <div className="flex items-end">
               {portfolioValue > 0 ? (
@@ -112,30 +112,37 @@ export default function LoansPage() {
               )}
             </div>
           </div>
-          <p className="text-[11px] text-gray-500">Loans require approval from 2 admins. Repayments are automatically deducted from your monthly contributions.</p>
+          <p className="text-[11px] text-gray-500">Loans are quarterly (3 months). Requires 2 admin approvals. Repayments are auto-deducted from contributions. If not paid within 3 months, all contributions go to loan recovery.</p>
         </div>
       )}
 
       {/* Active Loan */}
       {activeLoan && (
-        <div className="card mb-6" style={{ borderColor: activeLoan.status === "active" ? "rgba(15,118,110,0.3)" : "rgba(217,119,6,0.3)" }}>
+        <div className="card mb-6" style={{ borderColor: activeLoan.is_overdue ? "rgba(239,68,68,0.4)" : activeLoan.status === "active" ? "rgba(15,118,110,0.3)" : "rgba(217,119,6,0.3)" }}>
+          {activeLoan.is_overdue && (
+            <div className="bg-red-900/20 border border-red-800/30 text-red-400 text-xs rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
+              <AlertTriangle size={14} /> This loan is overdue. All contributions will be applied to loan recovery until fully paid.
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Landmark size={18} className="text-brand-500" />
+              <Landmark size={18} className={activeLoan.is_overdue ? "text-red-400" : "text-brand-500"} />
               <span className="text-sm font-semibold">
                 {activeLoan.status === "active" ? "Active Loan" : "Loan Request"}
               </span>
             </div>
-            <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${STATUS_STYLES[activeLoan.status]?.bg}`}>
-              {activeLoan.approved_by_1 && !activeLoan.approved_by_2 ? "Approved (1/2)" : STATUS_STYLES[activeLoan.status]?.label}
+            <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${activeLoan.is_overdue ? "bg-red-900/20 text-red-400" : STATUS_STYLES[activeLoan.status]?.bg}`}>
+              {activeLoan.is_overdue ? "Overdue" : activeLoan.approved_by_1 && !activeLoan.approved_by_2 ? "Approved (1/2)" : STATUS_STYLES[activeLoan.status]?.label}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
             <div><div className="text-xs text-gray-500">Loan Amount</div><div className="text-lg font-bold font-mono">{fmtUGX(activeLoan.amount)}</div></div>
-            <div><div className="text-xs text-gray-500">Interest Rate</div><div className="text-lg font-bold font-mono">{activeLoan.interest_rate}%</div><div className="text-[11px] text-gray-500">per annum</div></div>
+            <div><div className="text-xs text-gray-500">Interest ({activeLoan.interest_rate}%)</div><div className="text-lg font-bold font-mono">{fmtUGX((activeLoan.calculated_total_due || activeLoan.total_due) - activeLoan.amount)}</div></div>
             <div><div className="text-xs text-gray-500">Total Due</div><div className="text-lg font-bold font-mono">{fmtUGX(activeLoan.calculated_total_due || activeLoan.total_due)}</div></div>
-            <div><div className="text-xs text-gray-500">Remaining</div><div className="text-lg font-bold font-mono text-amber-400">{fmtUGX(activeLoan.remaining || 0)}</div></div>
+            <div><div className="text-xs text-gray-500">Remaining</div><div className={`text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : "text-amber-400"}`}>{fmtUGX(activeLoan.remaining || 0)}</div></div>
+            {activeLoan.due_date && <div><div className="text-xs text-gray-500">Due Date</div><div className={`text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : ""}`}>{fmtDate(activeLoan.due_date)}</div></div>}
           </div>
 
           {activeLoan.status === "active" && activeLoan.calculated_total_due > 0 && (
@@ -145,13 +152,13 @@ export default function LoansPage() {
                 <span>{Math.min(100, Math.round((activeLoan.amount_paid / activeLoan.calculated_total_due) * 100))}%</span>
               </div>
               <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-                <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${Math.min(100, (activeLoan.amount_paid / activeLoan.calculated_total_due) * 100)}%` }} />
+                <div className={`h-full rounded-full transition-all ${activeLoan.is_overdue ? "bg-red-500" : "bg-brand-500"}`} style={{ width: `${Math.min(100, (activeLoan.amount_paid / activeLoan.calculated_total_due) * 100)}%` }} />
               </div>
             </div>
           )}
 
           {activeLoan.reason && <div className="text-xs text-gray-500 mb-2">Reason: <span className="text-gray-400">{activeLoan.reason}</span></div>}
-          <div className="text-[11px] text-gray-500">Requested {fmtDate(activeLoan.requested_at)}</div>
+          <div className="text-[11px] text-gray-500">Requested {fmtDate(activeLoan.requested_at)}{activeLoan.activated_at && ` · Activated ${fmtDate(activeLoan.activated_at)}`}</div>
 
           {activeLoan.status === "pending" && (
             <button onClick={() => handleCancel(activeLoan.id)} className={`mt-3 ${btnSecondary} text-xs px-3 py-1.5`}>Cancel Request</button>
@@ -196,7 +203,9 @@ export default function LoansPage() {
           <div className="bg-surface-2 rounded-lg p-4 mb-4 space-y-1.5 text-sm">
             <div className="flex justify-between"><span className="text-gray-500">Your portfolio</span><span className="font-mono">{fmtUGX(portfolioValue)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Max loan ({maxPct}%)</span><span className="font-mono text-brand-500">{fmtUGX(maxAmount)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Interest rate</span><span className="font-mono">{interestRate}% p.a.</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Interest rate</span><span className="font-mono">{interestRate}% (quarterly)</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Repayment</span><span className="font-mono">3 months</span></div>
+            {form.amount > 0 && <div className="flex justify-between border-t border-surface-3 pt-1.5 mt-1"><span className="text-gray-500">You will repay</span><span className="font-mono text-white">{fmtUGX(parseFloat(form.amount) * (1 + interestRate / 100))}</span></div>}
           </div>
           <FormField label="Loan Amount (UGX)">
             <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required min="1" max={maxAmount} className={inputClass} placeholder={`Max ${maxAmount.toLocaleString()}`} />
@@ -204,7 +213,7 @@ export default function LoansPage() {
           <FormField label="Reason">
             <input type="text" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} className={inputClass} placeholder="Why do you need this loan?" />
           </FormField>
-          <p className="text-[11px] text-gray-500">Requires approval from 2 admins. Repayments are auto-deducted from your contributions.</p>
+          <p className="text-[11px] text-gray-500">Requires 2 admin approvals. Must be repaid within 3 months. Repayments are auto-deducted from contributions. Overdue loans trigger full contribution recovery.</p>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={() => setShowRequest(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
             <button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Submitting..." : "Request Loan"}</button>

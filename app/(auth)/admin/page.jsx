@@ -418,7 +418,7 @@ export default function AdminPage() {
                         </div>
                         <div className="text-right">
                           <div className="text-lg font-bold font-mono">{fmtUGX(l.amount)}</div>
-                          <div className="text-[11px] text-gray-500">{l.interest_rate}% p.a.</div>
+                          <div className="text-[11px] text-gray-500">{l.interest_rate}% quarterly</div>
                         </div>
                       </div>
                       {l.reason && <div className="text-xs text-gray-400 mb-3">Reason: {l.reason}</div>}
@@ -445,19 +445,20 @@ export default function AdminPage() {
               <div className="mb-6">
                 <div className="text-xs font-semibold text-green-400 mb-2">ACTIVE LOANS</div>
                 <div className="card p-0 overflow-hidden">
-                  <div className="grid grid-cols-6 items-center px-5 py-2.5 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold">
-                    <span>MEMBER</span><span className="text-right">AMOUNT</span><span className="text-right">TOTAL DUE</span><span className="text-right">PAID</span><span className="text-right">REMAINING</span><span className="text-right">PROGRESS</span>
+                  <div className="grid grid-cols-7 items-center px-5 py-2.5 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold">
+                    <span>MEMBER</span><span className="text-right">AMOUNT</span><span className="text-right">TOTAL DUE</span><span className="text-right">PAID</span><span className="text-right">REMAINING</span><span className="text-right">DUE DATE</span><span className="text-right">STATUS</span>
                   </div>
                   {activeLoans.map((l) => {
                     const pct = l.calculated_total_due > 0 ? Math.min(100, Math.round((l.amount_paid / l.calculated_total_due) * 100)) : 0;
                     return (
-                      <div key={l.id} className="grid grid-cols-6 items-center px-5 py-3 border-b border-surface-3 text-[13px]">
+                      <div key={l.id} className={`grid grid-cols-7 items-center px-5 py-3 border-b border-surface-3 text-[13px] ${l.is_overdue ? "bg-red-900/5" : ""}`}>
                         <div className="font-medium">{l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
                         <div className="text-right font-mono">{fmtShort(l.amount)}</div>
                         <div className="text-right font-mono">{fmtShort(l.calculated_total_due)}</div>
                         <div className="text-right font-mono text-green-400">{fmtShort(l.amount_paid)}</div>
-                        <div className="text-right font-mono text-amber-400">{fmtShort(l.remaining)}</div>
-                        <div className="text-right"><div className="inline-flex items-center gap-2"><div className="w-16 h-1.5 bg-surface-2 rounded-full overflow-hidden"><div className="h-full bg-brand-500 rounded-full" style={{ width: `${pct}%` }} /></div><span className="text-[11px] text-gray-500 w-8">{pct}%</span></div></div>
+                        <div className={`text-right font-mono ${l.is_overdue ? "text-red-400" : "text-amber-400"}`}>{fmtShort(l.remaining)}</div>
+                        <div className="text-right text-xs">{l.due_date ? fmtDate(l.due_date) : "—"}</div>
+                        <div className="text-right">{l.is_overdue ? <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-900/20 text-red-400">Overdue</span> : <span className="text-[11px] text-gray-500">{pct}% paid</span>}</div>
                       </div>
                     );
                   })}
