@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 export const maxDuration = 15;
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
+import { calculateTotalDue } from "@/lib/loans";
 
 // GET /api/contributions?member_id=xxx&from=2026-01-01&to=2026-03-31
 export async function GET(request) {
@@ -71,6 +72,64 @@ export async function POST(request) {
       return NextResponse.json({ error: `Duplicate bank reference: ${bank_ref} already exists` }, { status: 400 });
     }
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  // Loan auto-deduction: deposits first clear any active loan
+  if (type === "deposit") {
+    const { data: activeLoan } = await db
+      .from("loans")
+      .select("*")
+      .eq("member_id", member_id)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (activeLoan) {
+      const currentDue = calculateTotalDue(activeLoan);
+      const remaining = Math.max(0, currentDue - activeLoan.amount_paid);
+      const depositAmount = parseFloat(amount);
+      const loanPayment = Math.min(depositAmount, remaining);
+      const excess = Math.round((depositAmount - loanPayment) * 100) / 100;
+
+      // Record loan payment
+      await db.from("loan_payments").insert({
+        loan_id: activeLoan.id,
+        member_id,
+        amount: loanPayment,
+        source: "contribution",
+        contribution_id: data.id,
+        note: `Auto-deducted from deposit of ${depositAmount}`,
+      });
+
+      // Update loan
+      const newAmountPaid = Math.round((activeLoan.amount_paid + loanPayment) * 100) / 100;
+      const loanPaid = newAmountPaid >= currentDue;
+
+      await db.from("loans").update({
+        amount_paid: newAmountPaid,
+        total_due: currentDue,
+        ...(loanPaid ? { status: "paid", paid_at: new Date().toISOString() } : {}),
+      }).eq("id", activeLoan.id);
+
+      // Adjust contribution: only the excess counts as a real contribution
+      if (excess > 0) {
+        await db.from("contributions").update({
+          amount: excess,
+          description: `${description || "Deposit"} (${Math.round(loanPayment).toLocaleString()} applied to loan)`,
+        }).eq("id", data.id);
+      } else {
+        await db.from("contributions").update({
+          amount: 0,
+          description: `Full deposit of ${Math.round(depositAmount).toLocaleString()} applied to loan repayment`,
+        }).eq("id", data.id);
+      }
+
+      // Return updated data
+      const { data: updated } = await db.from("contributions").select("*, members(name)").eq("id", data.id).single();
+      return NextResponse.json({
+        ...(updated || data),
+        loan_deduction: { loan_id: activeLoan.id, amount_applied: loanPayment, loan_remaining: remaining - loanPayment, loan_paid: loanPaid, excess },
+      });
+    }
   }
 
   return NextResponse.json(data);

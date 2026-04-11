@@ -1,6 +1,6 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSign, Settings, X } from "lucide-react";
+import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSign, Settings, X, Landmark } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "./Toast";
 import { CLUB_SHORT } from "@/lib/constants";
@@ -9,6 +9,7 @@ const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contributions", label: "Contributions", icon: DollarSign },
   { href: "/portfolio", label: "Portfolio", icon: PieChart },
+  { href: "/loans", label: "Loans", icon: Landmark },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

@@ -44,6 +44,29 @@ export async function GET() {
 
   const unpaidFines = (fines || []).filter((f) => !f.is_paid);
 
+  // Club history for club overview tab
+  const { data: clubHistory } = await db
+    .from("portfolio_snapshots")
+    .select("date, total_value, total_invested")
+    .order("date");
+
+  // Active loan
+  const { data: activeLoan } = await db
+    .from("loans")
+    .select("*")
+    .eq("member_id", session.id)
+    .in("status", ["pending", "approved", "active"])
+    .limit(1)
+    .maybeSingle();
+
+  // Loan settings
+  const { data: loanSettings } = await db
+    .from("settings")
+    .select("key, value")
+    .in("key", ["max_loan_pct", "loan_interest_rate"]);
+  const loanConfig = {};
+  (loanSettings || []).forEach((s) => { loanConfig[s.key] = s.value; });
+
   return NextResponse.json({
     member,
     valuation,
@@ -51,5 +74,8 @@ export async function GET() {
     contributions: contributions || [],
     fines: fines || [],
     unpaid_fines: unpaidFines,
+    club_history: clubHistory || [],
+    active_loan: activeLoan || null,
+    loan_settings: loanConfig,
   });
 }

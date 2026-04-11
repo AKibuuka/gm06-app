@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { useRouter } from "next/navigation";
-import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy } from "lucide-react";
+import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS } from "@/lib/format";
 
@@ -12,6 +12,7 @@ const TABS = [
   { id: "members", label: "Members", icon: Users },
   { id: "investments", label: "Investments", icon: PieChart },
   { id: "fines", label: "Fines", icon: AlertTriangle },
+  { id: "loans", label: "Loans", icon: Landmark },
 ];
 const ASSET_CLASSES = ["fixed_income", "stocks", "digital_assets", "real_estate", "private_equity", "loans", "cash"];
 
@@ -26,6 +27,7 @@ export default function AdminPage() {
   const [members, setMembers] = useState([]);
   const [investments, setInvestments] = useState([]);
   const [fines, setFines] = useState([]);
+  const [loans, setLoans] = useState([]);
   const [snapshots, setSnapshots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -54,11 +56,13 @@ export default function AdminPage() {
       fetch("/api/investments").then((r) => r.json()),
       fetch("/api/fines").then((r) => r.json()),
       fetch("/api/snapshots").then((r) => r.json()),
-    ]).then(([m, i, f, s]) => {
+      fetch("/api/loans").then((r) => r.json()),
+    ]).then(([m, i, f, s, l]) => {
       setMembers(Array.isArray(m) ? m : []);
       setInvestments(Array.isArray(i) ? i : []);
       setFines(Array.isArray(f) ? f : []);
       setSnapshots(Array.isArray(s) ? s : []);
+      setLoans(Array.isArray(l) ? l : []);
       setLoading(false);
     }).catch(() => { toast?.("Failed to load data", "error"); setLoading(false); });
   }, [user]);
@@ -78,16 +82,18 @@ export default function AdminPage() {
   }
 
   async function refreshData() {
-    const [m, i, f, s] = await Promise.all([
+    const [m, i, f, s, l] = await Promise.all([
       fetch("/api/members").then((r) => r.json()),
       fetch("/api/investments").then((r) => r.json()),
       fetch("/api/fines").then((r) => r.json()),
       fetch("/api/snapshots").then((r) => r.json()),
+      fetch("/api/loans").then((r) => r.json()),
     ]);
     setMembers(Array.isArray(m) ? m : []);
     setInvestments(Array.isArray(i) ? i : []);
     setFines(Array.isArray(f) ? f : []);
     setSnapshots(Array.isArray(s) ? s : []);
+    setLoans(Array.isArray(l) ? l : []);
   }
 
   // ── Valuation ──
@@ -375,6 +381,109 @@ export default function AdminPage() {
           </Modal>
         </div>
       )}
+
+      {/* ═══ LOANS ═══ */}
+      {tab === "loans" && (() => {
+        const pendingLoans = loans.filter((l) => l.status === "pending");
+        const activeLoans = loans.filter((l) => l.status === "active");
+        const pastLoans = loans.filter((l) => ["paid", "rejected"].includes(l.status));
+        const totalOutstanding = activeLoans.reduce((s, l) => s + (l.remaining || 0), 0);
+
+        async function handleLoanAction(loanId, action, notes) {
+          try {
+            const data = await apiCall("/api/loans", "PUT", { id: loanId, action, notes });
+            toast?.(data.message || `Loan ${action}ed`, "success");
+            await refreshData();
+          } catch (e) { toast?.(e.message, "error"); }
+        }
+
+        return (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-sm text-gray-500">
+                {pendingLoans.length} pending · {activeLoans.length} active · Outstanding: {fmtUGX(totalOutstanding)}
+              </span>
+            </div>
+
+            {pendingLoans.length > 0 && (
+              <div className="mb-6">
+                <div className="text-xs font-semibold text-amber-400 mb-2">PENDING APPROVAL</div>
+                <div className="space-y-3">
+                  {pendingLoans.map((l) => (
+                    <div key={l.id} className="card" style={{ borderColor: "rgba(217,119,6,0.3)" }}>
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="text-sm font-semibold">{l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
+                          <div className="text-[11px] text-gray-500">{fmtDate(l.requested_at)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold font-mono">{fmtUGX(l.amount)}</div>
+                          <div className="text-[11px] text-gray-500">{l.interest_rate}% p.a.</div>
+                        </div>
+                      </div>
+                      {l.reason && <div className="text-xs text-gray-400 mb-3">Reason: {l.reason}</div>}
+                      <div className="flex items-center gap-2 mb-3 text-xs">
+                        <span className="text-gray-500">Approvals:</span>
+                        {l.approved_by_1 ? (
+                          <span className="px-2 py-0.5 rounded bg-green-900/20 text-green-400 font-semibold">{l.approver1?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "Admin 1"}</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded bg-surface-2 text-gray-500">Awaiting 1st</span>
+                        )}
+                        <span className="px-2 py-0.5 rounded bg-surface-2 text-gray-500">Awaiting 2nd</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => handleLoanAction(l.id, "approve")} className={`${btnPrimary} px-4 text-xs`}>Approve</button>
+                        <button onClick={() => handleLoanAction(l.id, "reject")} className={`${btnSecondary} px-4 text-xs`}>Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeLoans.length > 0 && (
+              <div className="mb-6">
+                <div className="text-xs font-semibold text-green-400 mb-2">ACTIVE LOANS</div>
+                <div className="card p-0 overflow-hidden">
+                  <div className="grid grid-cols-6 items-center px-5 py-2.5 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold">
+                    <span>MEMBER</span><span className="text-right">AMOUNT</span><span className="text-right">TOTAL DUE</span><span className="text-right">PAID</span><span className="text-right">REMAINING</span><span className="text-right">PROGRESS</span>
+                  </div>
+                  {activeLoans.map((l) => {
+                    const pct = l.calculated_total_due > 0 ? Math.min(100, Math.round((l.amount_paid / l.calculated_total_due) * 100)) : 0;
+                    return (
+                      <div key={l.id} className="grid grid-cols-6 items-center px-5 py-3 border-b border-surface-3 text-[13px]">
+                        <div className="font-medium">{l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
+                        <div className="text-right font-mono">{fmtShort(l.amount)}</div>
+                        <div className="text-right font-mono">{fmtShort(l.calculated_total_due)}</div>
+                        <div className="text-right font-mono text-green-400">{fmtShort(l.amount_paid)}</div>
+                        <div className="text-right font-mono text-amber-400">{fmtShort(l.remaining)}</div>
+                        <div className="text-right"><div className="inline-flex items-center gap-2"><div className="w-16 h-1.5 bg-surface-2 rounded-full overflow-hidden"><div className="h-full bg-brand-500 rounded-full" style={{ width: `${pct}%` }} /></div><span className="text-[11px] text-gray-500 w-8">{pct}%</span></div></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {pastLoans.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-gray-500 mb-2">HISTORY</div>
+                <div className="card p-0 overflow-hidden">
+                  {pastLoans.slice(0, 20).map((l) => (
+                    <div key={l.id} className="flex items-center justify-between px-5 py-2.5 border-b border-surface-3 text-[13px]">
+                      <div><div className="font-medium">{l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div><div className="text-[11px] text-gray-500">{fmtDate(l.requested_at)}</div></div>
+                      <div className="font-mono">{fmtShort(l.amount)}</div>
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${l.status === "paid" ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{l.status === "paid" ? "Paid" : "Rejected"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {loans.length === 0 && <div className="card text-center py-8 text-gray-500 text-sm">No loan requests yet</div>}
+          </div>
+        );
+      })()}
     </div>
   );
 }
