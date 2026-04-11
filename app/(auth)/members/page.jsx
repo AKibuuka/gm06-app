@@ -30,11 +30,15 @@ function StatementModal({ member, onClose }) {
         {loading ? (
           <div className="py-16 text-center text-gray-400">Loading statement...</div>
         ) : data?.snapshot ? (() => {
-          const now = new Date();
-          const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-          const nextMonthStart = now.getMonth() === 11 ? `${now.getFullYear() + 1}-01-01` : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, "0")}-01`;
-          const thisMonthContribs = (data.contributions || []).filter((c) => c.type === "deposit" && c.date >= currentMonthStart && c.date < nextMonthStart);
-          const thisMonthTotal = thisMonthContribs.reduce((s, c) => s + c.amount, 0);
+          // Contributions for the snapshot month (not current month)
+          const snapDate = new Date(data.date);
+          const snapYear = snapDate.getFullYear();
+          const snapMonth = snapDate.getMonth();
+          const monthStart = `${snapYear}-${String(snapMonth + 1).padStart(2, "0")}-01`;
+          const monthEnd = snapMonth === 11 ? `${snapYear + 1}-01-01` : `${snapYear}-${String(snapMonth + 2).padStart(2, "0")}-01`;
+          const monthContribs = (data.contributions || []).filter((c) => c.type === "deposit" && c.date >= monthStart && c.date < monthEnd);
+          const monthTotal = monthContribs.reduce((s, c) => s + c.amount, 0);
+          const monthLabel = snapDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
           return (
           <>
             <div className="text-center mb-6">
@@ -52,7 +56,7 @@ function StatementModal({ member, onClose }) {
                 <div><span className="text-gray-500 text-xs">Total Invested</span><br /><strong>{fmtUGX(data.snapshot.total_invested)}</strong></div>
                 <div><span className="text-gray-500 text-xs">Total Return</span><br /><strong className="text-green-600">{data.snapshot.total_invested > 0 ? (((data.snapshot.portfolio_value - data.snapshot.total_invested) / data.snapshot.total_invested) * 100).toFixed(1) : 0}%</strong></div>
                 <div><span className="text-gray-500 text-xs">Monthly Contribution</span><br /><strong>{fmtUGX(data.member.monthly_contribution)}</strong></div>
-                <div><span className="text-gray-500 text-xs">Contributed This Month</span><br /><strong className={thisMonthTotal > 0 ? "text-green-600" : "text-red-600"}>{thisMonthTotal > 0 ? fmtUGX(thisMonthTotal) : "Not yet paid"}</strong></div>
+                <div><span className="text-gray-500 text-xs">Contribution ({monthLabel})</span><br /><strong className={monthTotal > 0 ? "text-green-600" : "text-red-600"}>{monthTotal > 0 ? fmtUGX(monthTotal) : "None"}</strong></div>
               </div>
             </div>
 
