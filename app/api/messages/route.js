@@ -87,7 +87,7 @@ export async function POST(request) {
     sender_id: session.id,
     recipient_id,
     body: body.trim(),
-  }).select("*, sender:members!messages_sender_id_fkey(id, name)").single();
+  }).select("*, sender:members!sender_id(id, name)").single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data);

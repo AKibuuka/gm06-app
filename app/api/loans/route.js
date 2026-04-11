@@ -17,7 +17,7 @@ export async function GET(request) {
   const db = getServiceClient();
   let query = db
     .from("loans")
-    .select("*, members(name), approver1:members!fk_approved_by_1(name), approver2:members!fk_approved_by_2(name), loan_payments(id, amount, created_at, note)")
+    .select("*, members(name), loan_payments(id, amount, created_at, note)")
     .order("requested_at", { ascending: false });
 
   if (!isAdmin(session)) {
@@ -31,8 +31,19 @@ export async function GET(request) {
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Fetch approver names separately (multiple FKs to same table)
+  const approverIds = new Set();
+  (data || []).forEach((l) => { if (l.approved_by_1) approverIds.add(l.approved_by_1); if (l.approved_by_2) approverIds.add(l.approved_by_2); });
+  let approverMap = {};
+  if (approverIds.size > 0) {
+    const { data: approvers } = await db.from("members").select("id, name").in("id", [...approverIds]);
+    (approvers || []).forEach((a) => { approverMap[a.id] = a.name; });
+  }
+
   const enriched = (data || []).map((loan) => ({
     ...loan,
+    approver1: loan.approved_by_1 ? { name: approverMap[loan.approved_by_1] || null } : null,
+    approver2: loan.approved_by_2 ? { name: approverMap[loan.approved_by_2] || null } : null,
     calculated_total_due: calculateTotalDue(loan),
     remaining: calculateRemaining(loan),
     due_date: getDueDate(loan)?.toISOString().split("T")[0] || null,

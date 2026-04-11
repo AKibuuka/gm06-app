@@ -106,7 +106,7 @@ export async function POST(request) {
 
       // Update loan
       const newAmountPaid = Math.round((activeLoan.amount_paid + loanPayment) * 100) / 100;
-      const loanPaid = newAmountPaid >= currentDue;
+      const loanPaid = newAmountPaid >= currentDue - 0.01; // epsilon for float precision
 
       await db.from("loans").update({
         amount_paid: newAmountPaid,

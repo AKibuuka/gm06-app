@@ -102,7 +102,6 @@ export default function AdminPage() {
     setSnapshots(Array.isArray(s) ? s : []);
     setLoans(Array.isArray(l) ? l : []);
     setAnnouncements(Array.isArray(a) ? a : []);
-    setAnnouncements(Array.isArray(a) ? a : []);
   }
 
   // ── Valuation ──

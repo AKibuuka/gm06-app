@@ -26,7 +26,7 @@ function MemberDashboard({ hideHeader = false }) {
   if (!data?.valuation) return <div className="card text-gray-400 text-sm">No portfolio data available yet. The treasurer needs to run a monthly valuation first.</div>;
 
   const { member, valuation: v, history, contributions, unpaid_fines, club_history, active_loan, contribution_status, announcements } = data;
-  const segments = (v.allocation || []).filter((a) => a.pct > 0).map((a) => ({
+  const segments = ((v && v.allocation) || []).filter((a) => a.pct > 0).map((a) => ({
     label: ASSET_CLASS_LABELS[a.asset_class] || a.asset_class, pct: a.pct, color: ASSET_CLASS_COLORS[a.asset_class] || "#666", value: a.member_value, clubValue: a.club_value,
   }));
   const up = v.total_gain >= 0;
