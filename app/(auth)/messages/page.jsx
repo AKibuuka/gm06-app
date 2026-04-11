@@ -7,6 +7,7 @@ import Modal, { FormField, selectClass, btnPrimary, btnSecondary } from "@/compo
 import { fmtDate } from "@/lib/format";
 import useTitle from "@/lib/useTitle";
 import { SkeletonPage } from "@/components/Skeleton";
+import Avatar from "@/components/Avatar";
 
 export default function MessagesPage() {
   const user = useUser();
@@ -109,12 +110,17 @@ export default function MessagesPage() {
             ) : conversations.map((c) => (
               <button key={c.partner_id} onClick={() => setActiveConvo(c.partner_id)}
                 className={`w-full text-left px-4 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors ${activeConvo === c.partner_id ? "bg-surface-2" : ""}`}>
-                <div className="flex justify-between items-start">
-                  <div className="text-sm font-medium truncate">{titleCase(c.partner_name)}</div>
-                  {c.unread > 0 && <span className="bg-brand-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-2">{c.unread}</span>}
+                <div className="flex items-start gap-2.5">
+                  <Avatar name={c.partner_name} size={32} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <div className="text-sm font-medium truncate">{titleCase(c.partner_name)}</div>
+                      {c.unread > 0 && <span className="bg-brand-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-2">{c.unread}</span>}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate mt-0.5">{c.last_message || "No messages"}</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">{c.last_message_at ? fmtDate(c.last_message_at) : ""}</div>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500 truncate mt-0.5">{c.last_message || "No messages"}</div>
-                <div className="text-[10px] text-gray-600 mt-0.5">{c.last_message_at ? fmtDate(c.last_message_at) : ""}</div>
               </button>
             ))}
           </div>

@@ -4,6 +4,7 @@ import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSi
 import { useState, useEffect } from "react";
 import { useToast } from "./Toast";
 import { CLUB_SHORT } from "@/lib/constants";
+import Avatar from "./Avatar";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -97,9 +98,12 @@ export default function Sidebar({ user, onClose }) {
             <RefreshCw size={14} className={updating ? "animate-spin" : ""} />{updating ? "Updating..." : "Update Prices"}
           </button>
         )}
-        <div className="px-4 py-2">
-          <div className="text-xs font-medium truncate">{user?.name?.split(" ").map(w=>w[0]+w.slice(1).toLowerCase()).join(" ")}</div>
-          <div className="text-[10px] text-gray-500 capitalize">{user?.role}</div>
+        <div className="px-4 py-2 flex items-center gap-2.5">
+          <Avatar name={user?.name} size={28} />
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">{user?.name?.split(" ").map(w=>w[0]+w.slice(1).toLowerCase()).join(" ")}</div>
+            <div className="text-[10px] text-gray-500 capitalize">{user?.role}</div>
+          </div>
         </div>
         <button onClick={handleLogout}
           className="w-full flex items-center gap-2 px-4 py-2 rounded-lg text-xs text-gray-400 hover:bg-red-900/20 hover:text-red-400 transition-colors">

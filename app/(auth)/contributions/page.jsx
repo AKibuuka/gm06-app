@@ -61,7 +61,11 @@ export default function ContributionsPage() {
       setContributions([data, ...contributions]);
       setShowAdd(false);
       setForm({ member_id: "", amount: "", type: "deposit", description: "", bank_ref: "", date: new Date().toISOString().split("T")[0] });
-    } else { alert((await res.json()).error); }
+      const msg = data.loan_deduction
+        ? `Recorded ${fmtUGX(parseFloat(form.amount))} — ${fmtUGX(data.loan_deduction.amount_applied)} applied to loan, ${fmtUGX(data.loan_deduction.excess)} to portfolio`
+        : `Contribution of ${fmtUGX(data.amount)} recorded`;
+      toast?.(msg, "success");
+    } else { const err = await res.json(); toast?.(err.error, "error"); }
     setSubmitting(false);
   }
 
@@ -79,6 +83,14 @@ export default function ContributionsPage() {
     }
     setContributions([...results, ...contributions]);
     setShowBatch(false); setBatchAmounts({}); setBatchRefs({}); setSubmitting(false);
+
+    // Show receipt summary
+    const totalRecorded = results.reduce((s, r) => s + (r.amount || 0), 0);
+    const loanDeductions = results.filter((r) => r.loan_deduction);
+    const loanTotal = loanDeductions.reduce((s, r) => s + (r.loan_deduction?.amount_applied || 0), 0);
+    let msg = `Recorded ${results.length} contributions totaling ${fmtUGX(totalRecorded + loanTotal)}`;
+    if (loanDeductions.length > 0) msg += `. ${loanDeductions.length} had loan deductions (${fmtUGX(loanTotal)} applied to loans)`;
+    toast?.(msg, "success");
   }
 
   if (loading) return <SkeletonPage cards={3} rows={6} />;

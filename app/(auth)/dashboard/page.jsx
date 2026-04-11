@@ -4,9 +4,10 @@ import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { StatCard, DonutChart, Sparkline } from "@/components/Charts";
 import { fmtUGX, fmtShort, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
-import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Landmark, Wallet, BarChart3, MessageSquare } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Landmark, Wallet, BarChart3, MessageSquare, DollarSign, PieChart } from "lucide-react";
 import { CLUB_SHORT } from "@/lib/constants";
 import useTitle from "@/lib/useTitle";
+import Avatar, { titleCase } from "@/components/Avatar";
 
 function MemberDashboard({ hideHeader = false }) {
   useTitle("Dashboard");
@@ -25,7 +26,16 @@ function MemberDashboard({ hideHeader = false }) {
 
   if (loading) return <div className="flex items-center justify-center h-64"><Clock size={18} className="animate-pulse text-gray-500 mr-2" /><span className="text-gray-500 text-sm">Loading your portfolio...</span></div>;
   if (error) return <div className="card border-red-800/30 text-red-400 text-sm">{error}</div>;
-  if (!data?.valuation) return <div className="card text-gray-400 text-sm">No portfolio data available yet. The treasurer needs to run a monthly valuation first.</div>;
+  if (!data?.valuation) return (
+    <div className="animate-in">
+      {!hideHeader && <div className="mb-7"><h1 className="text-2xl font-bold">Welcome to {CLUB_SHORT}</h1></div>}
+      <div className="card text-center py-12">
+        <Wallet size={40} className="text-gray-600 mx-auto mb-4" />
+        <div className="text-sm font-semibold text-gray-400 mb-2">Your portfolio is being set up</div>
+        <div className="text-xs text-gray-500 max-w-sm mx-auto">The treasurer needs to record contributions and run the first monthly valuation. Once that's done, you'll see your portfolio value, holdings, and growth here.</div>
+      </div>
+    </div>
+  );
 
   const { member, valuation: v, history, contributions, unpaid_fines, club_history, active_loan, contribution_status, announcements } = data;
   const segments = ((v && v.allocation) || []).filter((a) => a.pct > 0).map((a) => ({
@@ -357,6 +367,13 @@ function AdminDashboard() {
         </div>
       )}
 
+      {/* Quick Actions */}
+      <div className="flex flex-wrap gap-2 mb-5">
+        <a href="/contributions" className="bg-surface-1 hover:bg-surface-2 border border-surface-3 text-sm text-gray-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"><DollarSign size={14} className="text-green-400" />Record Contributions</a>
+        <a href="/admin" className="bg-surface-1 hover:bg-surface-2 border border-surface-3 text-sm text-gray-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"><BarChart3 size={14} className="text-brand-500" />Run Valuation</a>
+        <a href="/admin" className="bg-surface-1 hover:bg-surface-2 border border-surface-3 text-sm text-gray-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"><PieChart size={14} className="text-purple-400" />Manage Investments</a>
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatCard label="Portfolio Value" value={fmtUGX(totalValue)} sub={`${returnPct >= 0 ? "+" : ""}${returnPct}% return`} color="#22C55E" />
         <StatCard label="Total Invested" value={fmtUGX(totalInvested)} sub={`${members.length} members`} color="#3B82F6" />
@@ -388,7 +405,7 @@ function AdminDashboard() {
             const ret = s && s.total_invested > 0 ? (((s.portfolio_value - s.total_invested) / s.total_invested) * 100).toFixed(1) : 0;
             return (
               <div key={m.id} className="grid grid-cols-5 items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
-                <div><div className="font-medium">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div><div className="text-[11px] text-gray-500">{m.monthly_contribution > 0 ? `${fmtShort(m.monthly_contribution)}/mo` : "No monthly"}</div></div>
+                <div className="flex items-center gap-2.5"><Avatar name={m.name} size={30} /><div><div className="font-medium">{titleCase(m.name)}</div><div className="text-[11px] text-gray-500">{m.monthly_contribution > 0 ? `${fmtShort(m.monthly_contribution)}/mo` : "No monthly"}</div></div></div>
                 <div className="text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
                 <div className="text-right font-mono font-semibold">{fmtShort(s?.portfolio_value || 0)}</div>
                 <div className={`text-right font-semibold ${ret >= 0 ? "text-green-400" : "text-red-400"}`}>{ret >= 0 ? "+" : ""}{ret}%</div>
