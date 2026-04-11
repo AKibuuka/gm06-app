@@ -94,7 +94,7 @@ function MemberDashboard({ hideHeader = false }) {
                     {a.pinned && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-900/20 text-blue-400 font-semibold">Pinned</span>}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">{a.body}</div>
-                  <div className="text-[10px] text-gray-600 mt-1">{a.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")} · {new Date(a.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</div>
+                  <div className="text-[10px] text-gray-600 mt-1">{a.author?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")} · {new Date(a.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</div>
                 </div>
               </div>
             </div>

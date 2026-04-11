@@ -10,7 +10,7 @@ export async function GET() {
   const db = getServiceClient();
   const { data, error } = await db
     .from("announcements")
-    .select("*, members!announcements_author_id_fkey(name)")
+    .select("*, author:members(name)")
     .order("pinned", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(50);
@@ -33,7 +33,7 @@ export async function POST(request) {
     title,
     body,
     pinned: pinned || false,
-  }).select("*, members!announcements_author_id_fkey(name)").single();
+  }).select("*, author:members(name)").single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data);

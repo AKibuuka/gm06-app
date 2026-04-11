@@ -96,7 +96,7 @@ export async function GET() {
   // Latest announcements (last 5)
   const { data: announcements } = await db
     .from("announcements")
-    .select("id, title, body, pinned, created_at, members!announcements_author_id_fkey(name)")
+    .select("id, title, body, pinned, created_at, author:members(name)")
     .order("pinned", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(5);

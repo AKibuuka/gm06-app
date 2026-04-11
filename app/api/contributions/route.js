@@ -89,9 +89,10 @@ export async function POST(request) {
       const depositAmount = parseFloat(amount);
       const overdue = isOverdue(activeLoan);
 
-      // If overdue, entire contribution goes to loan recovery (no excess to portfolio)
-      const loanPayment = overdue ? depositAmount : Math.min(depositAmount, remaining);
-      const excess = overdue ? 0 : Math.round((depositAmount - loanPayment) * 100) / 100;
+      // Loan payment: min of deposit and remaining balance
+      const loanPayment = Math.min(depositAmount, remaining);
+      // If overdue: no excess goes to portfolio (all to loan). If current: excess is a normal contribution.
+      const excess = overdue ? 0 : Math.max(0, Math.round((depositAmount - loanPayment) * 100) / 100);
 
       // Record loan payment
       await db.from("loan_payments").insert({

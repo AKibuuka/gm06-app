@@ -17,17 +17,17 @@ export async function GET(request) {
 
   switch (type) {
     case "members": {
-      const { data: members } = await db.from("members").select("name, email, phone, monthly_contribution, is_active, joined_at").eq("is_active", true).order("name");
+      const { data: members } = await db.from("members").select("id, name, email, phone, monthly_contribution, is_active, joined_at").eq("is_active", true).order("name");
       const { data: latestSnap } = await db.from("member_snapshots").select("date").order("date", { ascending: false }).limit(1).single();
       let snapshots = {};
       if (latestSnap) {
-        const { data: snaps } = await db.from("member_snapshots").select("*, members(name)").eq("date", latestSnap.date);
-        (snaps || []).forEach((s) => { if (s.members) snapshots[s.members.name] = s; });
+        const { data: snaps } = await db.from("member_snapshots").select("*").eq("date", latestSnap.date);
+        (snaps || []).forEach((s) => { snapshots[s.member_id] = s; });
       }
 
       csv = "Name,Email,Phone,Monthly Contribution,Total Invested,Portfolio Value,Total Gain,Return %,Advance Contribution\n";
       (members || []).forEach((m) => {
-        const s = snapshots[m.name];
+        const s = snapshots[m.id];
         const gain = s ? s.portfolio_value - s.total_invested : 0;
         const ret = s && s.total_invested > 0 ? ((gain / s.total_invested) * 100).toFixed(1) : 0;
         csv += `"${m.name}","${m.email}","${m.phone || ""}",${m.monthly_contribution},${s?.total_invested || 0},${s?.portfolio_value || 0},${Math.round(gain)},${ret}%,${s?.advance_contribution || 0}\n`;

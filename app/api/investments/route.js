@@ -42,18 +42,17 @@ export async function PUT(request) {
   const { id, ...updates } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
+  const db = getServiceClient();
+
   // Recalculate value if price or quantity changed
   if (updates.current_price !== undefined && updates.quantity !== undefined) {
     updates.current_value = parseFloat(updates.current_price) * parseFloat(updates.quantity);
   } else if (updates.current_price !== undefined) {
-    const db2 = getServiceClient();
-    const { data: existing } = await db2.from("investments").select("quantity").eq("id", id).single();
+    const { data: existing } = await db.from("investments").select("quantity").eq("id", id).single();
     if (existing) updates.current_value = parseFloat(updates.current_price) * existing.quantity;
   }
 
   updates.updated_at = new Date().toISOString();
-
-  const db = getServiceClient();
   const { data, error } = await db.from("investments").update(updates).eq("id", id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data);

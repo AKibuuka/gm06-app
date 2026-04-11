@@ -29,19 +29,16 @@ export default function Sidebar({ user, onClose }) {
 
   const navItems = user?.role === "admin" ? [...NAV, ...ADMIN_NAV] : NAV;
 
-  // Fetch unread message count
+  // Fetch unread message count (lightweight endpoint)
   useEffect(() => {
-    fetch("/api/me")
-      .then((r) => r.json())
-      .then((d) => { if (d?.unread_messages) setUnreadCount(d.unread_messages); })
-      .catch(() => {});
-    // Refresh every 60 seconds
-    const interval = setInterval(() => {
-      fetch("/api/me")
+    function fetchUnread() {
+      fetch("/api/messages/unread")
         .then((r) => r.json())
-        .then((d) => { if (d?.unread_messages !== undefined) setUnreadCount(d.unread_messages); })
+        .then((d) => { if (d?.count !== undefined) setUnreadCount(d.count); })
         .catch(() => {});
-    }, 60000);
+    }
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 60000);
     return () => clearInterval(interval);
   }, []);
 

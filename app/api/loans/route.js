@@ -17,7 +17,7 @@ export async function GET(request) {
   const db = getServiceClient();
   let query = db
     .from("loans")
-    .select("*, members!loans_member_id_fkey(name), approver1:members!fk_approved_by_1(name), approver2:members!fk_approved_by_2(name), loan_payments(id, amount, created_at, note)")
+    .select("*, members(name), approver1:members!fk_approved_by_1(name), approver2:members!fk_approved_by_2(name), loan_payments(id, amount, created_at, note)")
     .order("requested_at", { ascending: false });
 
   if (!isAdmin(session)) {

@@ -17,7 +17,7 @@ export async function GET(request) {
     // Get messages in this conversation + mark as read
     const { data, error } = await db
       .from("messages")
-      .select("*, sender:members!messages_sender_id_fkey(id, name), recipient:members!messages_recipient_id_fkey(id, name)")
+      .select("*, sender:members!sender_id(id, name), recipient:members!recipient_id(id, name)")
       .or(`and(sender_id.eq.${session.id},recipient_id.eq.${withMemberId}),and(sender_id.eq.${withMemberId},recipient_id.eq.${session.id})`)
       .order("created_at", { ascending: true })
       .limit(100);
@@ -38,7 +38,7 @@ export async function GET(request) {
   // Plus unread count
   const { data: allMessages, error } = await db
     .from("messages")
-    .select("id, sender_id, recipient_id, body, is_read, created_at, sender:members!messages_sender_id_fkey(id, name), recipient:members!messages_recipient_id_fkey(id, name)")
+    .select("id, sender_id, recipient_id, body, is_read, created_at, sender:members!sender_id(id, name), recipient:members!recipient_id(id, name)")
     .or(`sender_id.eq.${session.id},recipient_id.eq.${session.id}`)
     .order("created_at", { ascending: false })
     .limit(500);

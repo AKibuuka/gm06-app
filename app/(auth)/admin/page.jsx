@@ -88,7 +88,7 @@ export default function AdminPage() {
   }
 
   async function refreshData() {
-    const [m, i, f, s, l] = await Promise.all([
+    const [m, i, f, s, l, a] = await Promise.all([
       fetch("/api/members").then((r) => r.json()),
       fetch("/api/investments").then((r) => r.json()),
       fetch("/api/fines").then((r) => r.json()),
@@ -101,6 +101,7 @@ export default function AdminPage() {
     setFines(Array.isArray(f) ? f : []);
     setSnapshots(Array.isArray(s) ? s : []);
     setLoans(Array.isArray(l) ? l : []);
+    setAnnouncements(Array.isArray(a) ? a : []);
     setAnnouncements(Array.isArray(a) ? a : []);
   }
 
@@ -538,7 +539,7 @@ export default function AdminPage() {
                         </div>
                         <div className="text-xs text-gray-400">{a.body}</div>
                         <div className="text-[10px] text-gray-600 mt-2">
-                          {a.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")} · {fmtDate(a.created_at)}
+                          {a.author?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")} · {fmtDate(a.created_at)}
                         </div>
                       </div>
                       <button onClick={() => deleteAnnouncement(a.id)} className="p-1.5 rounded hover:bg-red-900/20 text-gray-500 hover:text-red-400 shrink-0"><Trash2 size={14} /></button>
