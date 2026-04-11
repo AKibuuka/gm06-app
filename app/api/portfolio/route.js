@@ -35,5 +35,11 @@ export async function GET() {
     .select("*")
     .order("date");
 
-  return NextResponse.json({ summary, totalValue, totalCost, investments, history: history || [] });
+  // Find latest price update time
+  const lastUpdated = (investments || []).reduce((latest, inv) => {
+    if (inv.updated_at && (!latest || inv.updated_at > latest)) return inv.updated_at;
+    return latest;
+  }, null);
+
+  return NextResponse.json({ summary, totalValue, totalCost, investments, history: history || [], last_updated: lastUpdated });
 }

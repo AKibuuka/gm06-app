@@ -34,8 +34,9 @@ function MemberDashboard({ hideHeader = false }) {
   // Growth metrics
   const now = new Date();
   const currentYear = now.getFullYear();
-  const prevMonth = history.length >= 1 ? history[history.length - 1] : null;
-  const janSnapshot = history.find((h) => h.date?.startsWith(`${currentYear}-01`)) || (history.length > 0 ? history.find((h) => h.date?.startsWith(`${currentYear}-`)) : null);
+  const safeHistory = history || [];
+  const prevMonth = safeHistory.length >= 1 ? safeHistory[safeHistory.length - 1] : null;
+  const janSnapshot = safeHistory.find((h) => h.date?.startsWith(`${currentYear}-01`)) || (safeHistory.length > 0 ? safeHistory.find((h) => h.date?.startsWith(`${currentYear}-`)) : null);
   const monthGain = prevMonth ? v.portfolio_value - prevMonth.portfolio_value : null;
   const monthPct = prevMonth && prevMonth.portfolio_value > 0 ? ((monthGain / prevMonth.portfolio_value) * 100).toFixed(1) : null;
   const ytdGain = janSnapshot ? v.portfolio_value - janSnapshot.portfolio_value : null;
@@ -138,13 +139,13 @@ function MemberDashboard({ hideHeader = false }) {
             <div className="lg:col-span-3 card">
               <div className="flex justify-between items-center mb-3">
                 <div className="text-sm font-semibold">Portfolio Over Time</div>
-                {history.length > 0 && <div className="text-[11px] text-gray-500">{new Date(history[0].date).toLocaleDateString("en-GB", { month: "short", year: "numeric" })} — Present</div>}
+                {safeHistory.length > 0 && <div className="text-[11px] text-gray-500">{new Date(safeHistory[0].date).toLocaleDateString("en-GB", { month: "short", year: "numeric" })} — Present</div>}
               </div>
-              {history.length > 1 ? (
+              {safeHistory.length > 1 ? (
                 <>
-                  <Sparkline data={history.map((h) => h.portfolio_value)} width={500} height={120} color="#14B8A6" />
+                  <Sparkline data={safeHistory.map((h) => h.portfolio_value)} width={500} height={120} color="#14B8A6" />
                   <div className="flex justify-between text-[10px] text-gray-600 mt-2 px-1">
-                    {history.filter((_, i) => i === 0 || i === history.length - 1 || i === Math.floor(history.length / 2)).map((h) => (
+                    {safeHistory.filter((_, i) => i === 0 || i === safeHistory.length - 1 || i === Math.floor(safeHistory.length / 2)).map((h) => (
                       <span key={h.date}>{new Date(h.date).toLocaleDateString("en-GB", { month: "short", year: "2-digit" })}</span>
                     ))}
                   </div>
@@ -379,7 +380,7 @@ function AdminDashboard() {
 
       <div className="card p-0 overflow-hidden">
         <div className="px-5 py-3 border-b border-surface-3 flex justify-between items-center"><span className="text-sm font-semibold">All Members</span><span className="text-xs text-gray-500">{members.length} members</span></div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto"><div className="min-w-[600px]">
           {members.sort((a, b) => (b.snapshot?.portfolio_value || 0) - (a.snapshot?.portfolio_value || 0)).map((m) => {
             const s = m.snapshot;
             const ret = s && s.total_invested > 0 ? (((s.portfolio_value - s.total_invested) / s.total_invested) * 100).toFixed(1) : 0;
@@ -393,7 +394,7 @@ function AdminDashboard() {
               </div>
             );
           })}
-        </div>
+        </div></div>
       </div>
     </div>
   );

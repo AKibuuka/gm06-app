@@ -117,7 +117,7 @@ export default function ContributionsPage() {
       </div>
 
       {/* Table */}
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden"><div className="overflow-x-auto"><div className={`${isAdmin ? "min-w-[700px]" : "min-w-[550px]"}`}>
         <div className={`grid ${isAdmin ? "grid-cols-6" : "grid-cols-5"} items-center px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide`}>
           <span>DATE</span>{isAdmin && <span>MEMBER</span>}<span>TYPE</span><span className="text-right">AMOUNT</span><span>BANK REF</span><span>DESCRIPTION</span>
         </div>
@@ -139,7 +139,7 @@ export default function ContributionsPage() {
             );
           })
         )}
-      </div>
+      </div></div></div>
 
       {/* Add Single Modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Record Contribution">

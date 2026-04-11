@@ -16,7 +16,7 @@ export default function PortfolioPage() {
   if (loading) return <div className="text-gray-500 text-sm p-8">Loading portfolio...</div>;
   if (!portfolio) return <div className="text-gray-500 text-sm p-8">Unable to load portfolio data.</div>;
 
-  const { summary, totalValue, investments, history } = portfolio;
+  const { summary, totalValue, investments, history, last_updated } = portfolio;
   const segments = Object.entries(summary || {}).map(([cls, data]) => ({
     label: ASSET_CLASS_LABELS[cls] || cls, cls, pct: data.percentage || 0, color: ASSET_CLASS_COLORS[cls] || "#666", value: data.value, cost: data.cost, investments: data.investments || [],
   }));
@@ -27,7 +27,13 @@ export default function PortfolioPage() {
 
   return (
     <div className="animate-in">
-      <div className="mb-7"><h1 className="text-2xl font-bold">Portfolio</h1><p className="text-sm text-gray-500 mt-1">Club-wide asset allocation and holdings</p></div>
+      <div className="mb-7">
+        <h1 className="text-2xl font-bold">Portfolio</h1>
+        <p className="text-sm text-gray-500 mt-1">Club-wide asset allocation and holdings</p>
+        {last_updated && (
+          <p className="text-[11px] text-gray-600 mt-1">Prices last updated: {new Date(last_updated).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className="card">
@@ -67,7 +73,7 @@ export default function PortfolioPage() {
             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded" style={{ background: s.color }} /><span className="text-sm font-semibold">{s.label}</span></div>
             <div className="text-sm font-mono font-semibold">{fmtUGX(s.value)}</div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto"><div className="min-w-[600px]">
             {s.investments.map((inv) => {
               const gain = (inv.current_value || 0) - (inv.cost_basis || 0);
               const gainPct = inv.cost_basis > 0 ? ((gain / inv.cost_basis) * 100).toFixed(1) : 0;
@@ -81,7 +87,7 @@ export default function PortfolioPage() {
                 </div>
               );
             })}
-          </div>
+          </div></div>
         </div>
       ))}
     </div>

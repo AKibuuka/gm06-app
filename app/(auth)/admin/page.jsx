@@ -327,7 +327,7 @@ export default function AdminPage() {
             return (
               <div key={cls} className="card p-0 overflow-hidden mb-4">
                 <div className="px-5 py-3 border-b border-surface-3 flex justify-between items-center bg-surface-2"><span className="text-sm font-semibold">{ASSET_CLASS_LABELS[cls]}</span><span className="text-sm font-mono">{fmtUGX(clsInv.reduce((s, i) => s + (i.current_value || 0), 0))}</span></div>
-                <div className="overflow-x-auto">{clsInv.map((inv) => (
+                <div className="overflow-x-auto"><div className="min-w-[700px]">{clsInv.map((inv) => (
                   <div key={inv.id} className="grid grid-cols-6 items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
                     <div><div className="font-medium">{inv.name}</div>{inv.ticker && <div className="text-[11px] text-gray-500">{inv.ticker}</div>}</div>
                     <div className="text-right font-mono text-gray-400">{Number(inv.quantity).toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
@@ -336,7 +336,7 @@ export default function AdminPage() {
                     <div className="text-right text-[11px] text-gray-500">{inv.price_source}</div>
                     <div className="text-right"><button onClick={() => { setEditItem(inv); setInvForm({ name: inv.name, ticker: inv.ticker || "", asset_class: inv.asset_class, quantity: inv.quantity, cost_basis: inv.cost_basis, current_price: inv.current_price, current_value: inv.current_value, price_source: inv.price_source, notes: inv.notes || "" }); setShowInvestmentForm(true); }} className="p-1.5 rounded hover:bg-surface-3 text-gray-400 hover:text-white"><Pencil size={14} /></button></div>
                   </div>
-                ))}</div>
+                ))}</div></div>
               </div>
             );
           })}
@@ -368,7 +368,7 @@ export default function AdminPage() {
           </div>
           <div className="card p-0 overflow-hidden">
             {fines.length === 0 ? <div className="px-5 py-8 text-center text-gray-500 text-sm">No fines recorded</div> : (
-              <div className="overflow-x-auto">{fines.map((f) => (
+              <div className="overflow-x-auto"><div className="min-w-[600px]">{fines.map((f) => (
                 <div key={f.id} className="grid grid-cols-5 items-center px-5 py-3 border-b border-surface-3 text-[13px] hover:bg-surface-2 transition-colors">
                   <div className="font-mono text-gray-400">{fmtDate(f.date)}</div>
                   <div>{f.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "—"}</div>
@@ -376,7 +376,7 @@ export default function AdminPage() {
                   <div className="text-right font-mono font-semibold text-amber-400">{fmtUGX(f.amount)}</div>
                   <div className="text-right"><button onClick={() => toggleFinePaid(f)} className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${f.is_paid ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{f.is_paid ? "Paid" : "Unpaid"}</button></div>
                 </div>
-              ))}</div>
+              ))}</div></div>
             )}
           </div>
           <Modal open={showFineForm} onClose={() => setShowFineForm(false)} title="Record Fine">
@@ -453,7 +453,7 @@ export default function AdminPage() {
             {activeLoans.length > 0 && (
               <div className="mb-6">
                 <div className="text-xs font-semibold text-green-400 mb-2">ACTIVE LOANS</div>
-                <div className="card p-0 overflow-hidden">
+                <div className="card p-0 overflow-hidden"><div className="overflow-x-auto"><div className="min-w-[800px]">
                   <div className="grid grid-cols-7 items-center px-5 py-2.5 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold">
                     <span>MEMBER</span><span className="text-right">AMOUNT</span><span className="text-right">TOTAL DUE</span><span className="text-right">PAID</span><span className="text-right">REMAINING</span><span className="text-right">DUE DATE</span><span className="text-right">STATUS</span>
                   </div>
@@ -471,7 +471,7 @@ export default function AdminPage() {
                       </div>
                     );
                   })}
-                </div>
+                </div></div></div>
               </div>
             )}
 

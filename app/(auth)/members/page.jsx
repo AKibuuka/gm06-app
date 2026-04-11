@@ -136,7 +136,7 @@ export default function MembersPage() {
         </div>
       </div>
 
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden"><div className="overflow-x-auto"><div className="min-w-[700px]">
         <div className="grid grid-cols-6 items-center px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide">
           <span>MEMBER</span><span className="text-right">INVESTED</span><span className="text-right">VALUE</span><span className="text-right">RETURN</span><span className="text-right">STATUS</span><span className="text-center">STATEMENT</span>
         </div>
@@ -163,7 +163,7 @@ export default function MembersPage() {
             </div>
           );
         })}
-      </div>
+      </div></div></div>
     </div>
   );
 }
