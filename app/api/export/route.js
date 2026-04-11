@@ -12,6 +12,14 @@ export async function GET(request) {
   const type = searchParams.get("type") || "members";
   const db = getServiceClient();
 
+  // Escape CSV values to prevent formula injection in spreadsheets
+  const esc = (v) => {
+    const s = String(v ?? "").replace(/"/g, '""');
+    // Prefix formula-triggering chars with a single quote
+    if (/^[=+\-@\t\r]/.test(s)) return `"'${s}"`;
+    return `"${s}"`;
+  };
+
   let csv = "";
   let filename = "";
 
@@ -30,7 +38,7 @@ export async function GET(request) {
         const s = snapshots[m.id];
         const gain = s ? s.portfolio_value - s.total_invested : 0;
         const ret = s && s.total_invested > 0 ? ((gain / s.total_invested) * 100).toFixed(1) : 0;
-        csv += `"${m.name}","${m.email}","${m.phone || ""}",${m.monthly_contribution},${s?.total_invested || 0},${s?.portfolio_value || 0},${Math.round(gain)},${ret}%,${s?.advance_contribution || 0}\n`;
+        csv += `${esc(m.name)},${esc(m.email)},${esc(m.phone)},${m.monthly_contribution},${s?.total_invested || 0},${s?.portfolio_value || 0},${Math.round(gain)},${ret}%,${s?.advance_contribution || 0}\n`;
       });
       filename = "gm06_members.csv";
       break;
@@ -40,7 +48,7 @@ export async function GET(request) {
       const { data } = await db.from("contributions").select("date, amount, type, description, bank_ref, members(name)").order("date", { ascending: false }).limit(1000);
       csv = "Date,Member,Type,Amount,Bank Ref,Description\n";
       (data || []).forEach((c) => {
-        csv += `${c.date},"${c.members?.name || ""}",${c.type},${c.amount},"${c.bank_ref || ""}","${(c.description || "").replace(/"/g, '""')}"\n`;
+        csv += `${c.date},${esc(c.members?.name)},${c.type},${c.amount},${esc(c.bank_ref)},${esc(c.description)}\n`;
       });
       filename = "gm06_contributions.csv";
       break;
@@ -50,7 +58,7 @@ export async function GET(request) {
       const { data } = await db.from("investments").select("name, ticker, asset_class, quantity, cost_basis, current_price, current_value, price_source, is_active").order("asset_class").order("name");
       csv = "Name,Ticker,Asset Class,Quantity,Cost Basis,Current Price,Current Value,Price Source,Active\n";
       (data || []).forEach((i) => {
-        csv += `"${i.name}","${i.ticker || ""}","${i.asset_class}",${i.quantity},${i.cost_basis},${i.current_price},${i.current_value},"${i.price_source}",${i.is_active}\n`;
+        csv += `${esc(i.name)},${esc(i.ticker)},${esc(i.asset_class)},${i.quantity},${i.cost_basis},${i.current_price},${i.current_value},${esc(i.price_source)},${i.is_active}\n`;
       });
       filename = "gm06_investments.csv";
       break;
@@ -63,7 +71,7 @@ export async function GET(request) {
       const { data: snaps } = await db.from("member_snapshots").select("*, members(name, phone, email)").eq("date", latestSnap.date).lt("advance_contribution", 0).order("advance_contribution");
       csv = "Name,Email,Phone,Amount Owed,Portfolio Value\n";
       (snaps || []).forEach((s) => {
-        csv += `"${s.members?.name || ""}","${s.members?.email || ""}","${s.members?.phone || ""}",${Math.abs(s.advance_contribution)},${s.portfolio_value}\n`;
+        csv += `${esc(s.members?.name)},${esc(s.members?.email)},${esc(s.members?.phone)},${Math.abs(s.advance_contribution)},${s.portfolio_value}\n`;
       });
       filename = "gm06_arrears.csv";
       break;

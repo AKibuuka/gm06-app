@@ -14,6 +14,10 @@ export async function GET(request) {
   const db = getServiceClient();
 
   if (withMemberId) {
+    // Validate UUID format to prevent filter injection
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(withMemberId)) {
+      return NextResponse.json({ error: "Invalid member ID" }, { status: 400 });
+    }
     // Get messages in this conversation + mark as read
     const { data, error } = await db
       .from("messages")

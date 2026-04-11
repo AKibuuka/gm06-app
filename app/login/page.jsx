@@ -29,9 +29,9 @@ function LoginForm() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Login failed"); setLoading(false); return; }
-      // MFA required — redirect to verification page
+      // MFA required — redirect to verification page (temp token is in httpOnly cookie)
       if (data.mfa_required) {
-        const params = new URLSearchParams({ t: data.temp_token, name: data.member?.name || "" });
+        const params = new URLSearchParams({ name: data.member?.name || "" });
         router.replace(`/mfa-verify?${params.toString()}`);
         return;
       }

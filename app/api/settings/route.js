@@ -16,12 +16,22 @@ export async function GET() {
 
 // PUT /api/settings — update settings (admin only)
 // Body: { ugx_rate: "3750", statement_date: "2026-04-01" }
+const ALLOWED_SETTINGS = [
+  "ugx_rate", "club_name", "statement_date", "monthly_target",
+  "required_contribution", "max_loan_pct", "loan_interest_rate",
+];
+
 export async function PUT(request) {
   const session = await getSession();
   if (!session || !isAdmin(session)) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
 
   const updates = await request.json();
   const db = getServiceClient();
+
+  const rejected = Object.keys(updates).filter(k => !ALLOWED_SETTINGS.includes(k));
+  if (rejected.length > 0) {
+    return NextResponse.json({ error: `Invalid setting keys: ${rejected.join(", ")}` }, { status: 400 });
+  }
 
   for (const [key, value] of Object.entries(updates)) {
     await db.from("settings").upsert({ key, value: String(value), updated_at: new Date().toISOString() }, { onConflict: "key" });

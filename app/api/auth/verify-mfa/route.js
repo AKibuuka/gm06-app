@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { verifyTempToken, createSessionToken } from "@/lib/auth";
 import { verifyMFACode, hashBackupCode } from "@/lib/mfa";
 import { getServiceClient } from "@/lib/supabase";
+import { cookies } from "next/headers";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request) {
-  const { temp_token, code } = await request.json();
+  const { code } = await request.json();
+  const cookieStore = await cookies();
+  const temp_token = cookieStore.get("gm06_mfa_temp")?.value;
 
   if (!temp_token || !code) {
     return NextResponse.json({ error: "Token and code are required" }, { status: 400 });
@@ -14,6 +18,15 @@ export async function POST(request) {
   const payload = verifyTempToken(temp_token);
   if (!payload) {
     return NextResponse.json({ error: "Session expired. Please log in again." }, { status: 401 });
+  }
+
+  // Rate limit MFA attempts: 5 per 5 minutes per user
+  const rl = checkRateLimit(`mfa:${payload.id}`, { max: 5, windowMs: 5 * 60 * 1000 });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please log in again." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
   }
 
   const db = getServiceClient();
@@ -60,13 +73,16 @@ export async function POST(request) {
   const response = NextResponse.json({
     member: { id: member.id, name: member.name, email: member.email, role: member.role },
   });
+  // Set full session cookie
   response.cookies.set("gm06_session", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     maxAge: 60 * 60 * 24 * 7,
     path: "/",
   });
+  // Clear the temp MFA cookie
+  response.cookies.delete("gm06_mfa_temp");
 
   return response;
 }

@@ -67,24 +67,45 @@ export async function GET() {
   const settingsMap = {};
   (allSettings || []).forEach((s) => { settingsMap[s.key] = s.value; });
 
-  // Contribution status: check if member has contributed this month
+  // Contribution status: calculate accumulated arrears + current month
   const now = new Date();
-  const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  const nextMonthStart = now.getMonth() === 11
-    ? `${now.getFullYear() + 1}-01-01`
-    : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, "0")}-01`;
-
-  const { data: thisMonthContribs } = await db
-    .from("contributions")
-    .select("amount")
-    .eq("member_id", session.id)
-    .eq("type", "deposit")
-    .gte("date", currentMonthStart)
-    .lt("date", nextMonthStart);
-
   const requiredAmount = parseFloat(settingsMap.required_contribution) || 0;
-  const thisMonthTotal = (thisMonthContribs || []).reduce((s, c) => s + c.amount, 0);
-  const contributionDue = requiredAmount > 0 && thisMonthTotal < requiredAmount;
+
+  // Calculate total months of expected contributions since member joined
+  const joinedDate = new Date(member.joined_at);
+  const joinYear = joinedDate.getFullYear();
+  const joinMonth = joinedDate.getMonth(); // 0-based
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  // Total months including the current month
+  const totalMonths = (currentYear - joinYear) * 12 + (currentMonth - joinMonth) + 1;
+
+  // Total expected contributions
+  const totalExpected = requiredAmount * Math.max(totalMonths, 0);
+
+  // Total deposits ever made by this member
+  const { data: allDeposits } = await db
+    .from("contributions")
+    .select("amount, date")
+    .eq("member_id", session.id)
+    .eq("type", "deposit");
+
+  const totalPaid = (allDeposits || []).reduce((s, c) => s + c.amount, 0);
+
+  // Current month deposits
+  const currentMonthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
+  const nextMonthStart = currentMonth === 11
+    ? `${currentYear + 1}-01-01`
+    : `${currentYear}-${String(currentMonth + 2).padStart(2, "0")}-01`;
+  const thisMonthTotal = (allDeposits || [])
+    .filter((c) => c.date >= currentMonthStart && c.date < nextMonthStart)
+    .reduce((s, c) => s + c.amount, 0);
+
+  // Arrears breakdown
+  const totalArrears = Math.max(0, totalExpected - totalPaid); // total amount behind
+  const currentMonthRemaining = Math.max(0, requiredAmount - thisMonthTotal); // what's left this month
+  const previousArrears = Math.max(0, totalArrears - currentMonthRemaining); // accumulated from past months
+  const contributionDue = requiredAmount > 0 && totalArrears > 0;
 
   // Unread messages count
   const { count: unreadMessages } = await db
@@ -112,7 +133,15 @@ export async function GET() {
     active_loan: activeLoan || null,
     loan_settings: { max_loan_pct: settingsMap.max_loan_pct, loan_interest_rate: settingsMap.loan_interest_rate },
     required_contribution: requiredAmount,
-    contribution_status: { required: requiredAmount, paid_this_month: thisMonthTotal, is_due: contributionDue },
+    contribution_status: {
+      required: requiredAmount,
+      paid_this_month: thisMonthTotal,
+      is_due: contributionDue,
+      total_arrears: totalArrears,
+      current_month_remaining: currentMonthRemaining,
+      previous_arrears: previousArrears,
+      months_behind: requiredAmount > 0 ? Math.floor(previousArrears / requiredAmount) : 0,
+    },
     unread_messages: unreadMessages || 0,
     announcements: announcements || [],
   });

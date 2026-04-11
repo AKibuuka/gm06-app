@@ -8,6 +8,7 @@ export function middleware(request) {
   // Public routes — no auth needed
   if (
     pathname === "/login" ||
+    pathname === "/mfa-verify" ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")

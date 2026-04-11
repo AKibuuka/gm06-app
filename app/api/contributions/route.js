@@ -69,7 +69,7 @@ export async function POST(request) {
 
   if (error) {
     if (error.code === "23505" && error.message?.includes("bank_ref")) {
-      return NextResponse.json({ error: `Duplicate bank reference: ${bank_ref} already exists` }, { status: 400 });
+      return NextResponse.json({ error: "A contribution with this bank reference already exists" }, { status: 400 });
     }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }

@@ -82,14 +82,33 @@ function MemberDashboard({ hideHeader = false }) {
 
       {/* Notifications */}
       {contribution_status?.is_due && (
-        <div className="card mb-5 flex items-center gap-3" style={{ borderColor: "rgba(239,68,68,0.3)", background: "rgba(127,29,29,0.1)" }}>
-          <AlertTriangle size={18} className="text-red-400 shrink-0" />
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-red-400">Contribution due</div>
-            <div className="text-xs text-gray-400">
-              Required: {fmtUGX(contribution_status.required)} — Paid this month: {fmtUGX(contribution_status.paid_this_month)} —
-              Remaining: <span className="text-red-400 font-mono">{fmtUGX(contribution_status.required - contribution_status.paid_this_month)}</span>
+        <div className="card mb-5" style={{ borderColor: "rgba(239,68,68,0.3)", background: "rgba(127,29,29,0.1)" }}>
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={18} className="text-red-400 shrink-0" />
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-red-400">Contribution Due</div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                Total outstanding: <span className="text-red-400 font-mono font-semibold">{fmtUGX(contribution_status.total_arrears)}</span>
+              </div>
             </div>
+          </div>
+          <div className="mt-3 space-y-1.5 pl-[30px]">
+            {contribution_status.previous_arrears > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">
+                  Past arrears <span className="text-gray-500">({contribution_status.months_behind} month{contribution_status.months_behind !== 1 ? "s" : ""} missed)</span>
+                </span>
+                <span className="font-mono text-red-400">{fmtUGX(contribution_status.previous_arrears)}</span>
+              </div>
+            )}
+            {contribution_status.current_month_remaining > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">
+                  This month <span className="text-gray-500">({fmtUGX(contribution_status.paid_this_month)} of {fmtUGX(contribution_status.required)} paid)</span>
+                </span>
+                <span className="font-mono text-amber-400">{fmtUGX(contribution_status.current_month_remaining)}</span>
+              </div>
+            )}
           </div>
         </div>
       )}

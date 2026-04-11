@@ -61,8 +61,8 @@ export async function POST(request) {
     return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
   }
 
-  // Generate default password: gm06-{last4digits of phone}
-  const defaultPwd = generateDefaultPassword(phone);
+  // Generate a random default password
+  const defaultPwd = generateDefaultPassword();
   const password_hash = await hashPassword(defaultPwd);
 
   const db = getServiceClient();
@@ -91,11 +91,24 @@ export async function PUT(request) {
   }
 
   const body = await request.json();
-  const { id, ...updates } = body;
+  const { id } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-  // Don't allow updating password_hash through this endpoint
-  delete updates.password_hash;
+  // Whitelist allowed fields to prevent mass assignment
+  const ALLOWED_FIELDS = ["name", "email", "phone", "role", "monthly_contribution", "is_active"];
+  const updates = {};
+  for (const key of ALLOWED_FIELDS) {
+    if (body[key] !== undefined) updates[key] = body[key];
+  }
+
+  // Validate role if provided
+  if (updates.role && !["admin", "member"].includes(updates.role)) {
+    return NextResponse.json({ error: "Invalid role. Must be 'admin' or 'member'" }, { status: 400 });
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+  }
 
   const db = getServiceClient();
   const { data, error } = await db.from("members")

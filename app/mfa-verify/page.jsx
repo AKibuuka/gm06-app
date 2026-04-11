@@ -11,13 +11,11 @@ function MFAVerifyForm() {
   const searchParams = useSearchParams();
   const inputRef = useRef(null);
 
-  const tempToken = searchParams.get("t");
   const memberName = searchParams.get("name") || "";
 
   useEffect(() => {
-    if (!tempToken) router.replace("/login");
     inputRef.current?.focus();
-  }, [tempToken, router]);
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -27,7 +25,7 @@ function MFAVerifyForm() {
       const res = await fetch("/api/auth/verify-mfa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ temp_token: tempToken, code: code.trim() }),
+        body: JSON.stringify({ code: code.trim() }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Verification failed"); setLoading(false); return; }

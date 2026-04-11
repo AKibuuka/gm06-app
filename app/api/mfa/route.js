@@ -40,6 +40,10 @@ export async function PUT(request) {
 
   const db = getServiceClient();
 
+  // Verify secret matches what was generated during POST (stored in mfa_secret while mfa_enabled is still false)
+  const { data: current } = await db.from("members").select("mfa_secret, mfa_enabled").eq("id", session.id).single();
+  if (current?.mfa_enabled) return NextResponse.json({ error: "MFA is already enabled" }, { status: 400 });
+
   // Save secret and enable MFA
   const { error } = await db.from("members").update({
     mfa_secret: secret,
