@@ -1,9 +1,1 @@
-{
-  "functions": {
-    "app/api/snapshots/route.js": { "maxDuration": 30 },
-    "app/api/prices/route.js": { "maxDuration": 30 },
-    "app/api/me/route.js": { "maxDuration": 15 },
-    "app/api/statements/pdf/route.js": { "maxDuration": 15 },
-    "app/api/export/route.js": { "maxDuration": 15 }
-  }
-}
+{}

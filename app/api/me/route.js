@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const maxDuration = 15;
 import { getSession } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 import { getMemberValuation, getMemberHistory } from "@/lib/valuation";
