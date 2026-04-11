@@ -1,0 +1,369 @@
+"use client";
+import { useState, useEffect } from "react";
+import { useUser } from "@/components/AuthShell";
+import { useToast } from "@/components/Toast";
+import { useRouter } from "next/navigation";
+import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy } from "lucide-react";
+import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
+import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS } from "@/lib/format";
+
+const TABS = [
+  { id: "valuation", label: "Valuation", icon: Calculator },
+  { id: "members", label: "Members", icon: Users },
+  { id: "investments", label: "Investments", icon: PieChart },
+  { id: "fines", label: "Fines", icon: AlertTriangle },
+];
+const ASSET_CLASSES = ["fixed_income", "stocks", "digital_assets", "real_estate", "private_equity", "loans", "cash"];
+
+export default function AdminPage() {
+  const user = useUser();
+  const router = useRouter();
+  const toast = useToast();
+
+  useEffect(() => { if (user && user.role !== "admin") router.replace("/dashboard"); }, [user, router]);
+
+  const [tab, setTab] = useState("valuation");
+  const [members, setMembers] = useState([]);
+  const [investments, setInvestments] = useState([]);
+  const [fines, setFines] = useState([]);
+  const [snapshots, setSnapshots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Modal states
+  const [showMemberForm, setShowMemberForm] = useState(false);
+  const [showInvestmentForm, setShowInvestmentForm] = useState(false);
+  const [showFineForm, setShowFineForm] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [newMemberCreds, setNewMemberCreds] = useState(null);
+  const [editItem, setEditItem] = useState(null);
+
+  // Forms
+  const [memberForm, setMemberForm] = useState({ name: "", email: "", phone: "", monthly_contribution: 0 });
+  const [invForm, setInvForm] = useState({ name: "", ticker: "", asset_class: "stocks", quantity: "", cost_basis: "", current_price: "", current_value: "", price_source: "manual", notes: "" });
+  const [fineForm, setFineForm] = useState({ member_id: "", amount: "", reason: "", date: new Date().toISOString().split("T")[0] });
+  const [resetForm, setResetForm] = useState({ member_id: "", new_password: "" });
+  const [valDate, setValDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; });
+  const [valResult, setValResult] = useState(null);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+    Promise.all([
+      fetch("/api/members").then((r) => r.json()),
+      fetch("/api/investments").then((r) => r.json()),
+      fetch("/api/fines").then((r) => r.json()),
+      fetch("/api/snapshots").then((r) => r.json()),
+    ]).then(([m, i, f, s]) => {
+      setMembers(Array.isArray(m) ? m : []);
+      setInvestments(Array.isArray(i) ? i : []);
+      setFines(Array.isArray(f) ? f : []);
+      setSnapshots(Array.isArray(s) ? s : []);
+      setLoading(false);
+    }).catch(() => { toast?.("Failed to load data", "error"); setLoading(false); });
+  }, [user]);
+
+  if (!user || user.role !== "admin") return null;
+  if (loading) return <div className="text-gray-500 text-sm p-8">Loading admin panel...</div>;
+
+  const activeInvestments = investments.filter((i) => i.is_active !== false);
+  const totalPortfolioValue = activeInvestments.reduce((s, i) => s + (i.current_value || 0), 0);
+
+  // ── Helpers ──
+  async function apiCall(url, method, body) {
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Request failed");
+    return data;
+  }
+
+  async function refreshData() {
+    const [m, i, f, s] = await Promise.all([
+      fetch("/api/members").then((r) => r.json()),
+      fetch("/api/investments").then((r) => r.json()),
+      fetch("/api/fines").then((r) => r.json()),
+      fetch("/api/snapshots").then((r) => r.json()),
+    ]);
+    setMembers(Array.isArray(m) ? m : []);
+    setInvestments(Array.isArray(i) ? i : []);
+    setFines(Array.isArray(f) ? f : []);
+    setSnapshots(Array.isArray(s) ? s : []);
+  }
+
+  // ── Valuation ──
+  async function generateValuation() {
+    setGenerating(true);
+    setValResult(null);
+    try {
+      const data = await apiCall("/api/snapshots", "POST", { date: valDate });
+      setValResult(data);
+      toast?.(`Valuation generated: ${fmtUGX(data.totalPortfolioValue)} across ${data.membersProcessed} members`, "success");
+      await refreshData();
+    } catch (e) { setValResult({ error: e.message }); toast?.(e.message, "error"); }
+    setGenerating(false);
+  }
+
+  // ── Members ──
+  async function saveMember(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (editItem) {
+        await apiCall("/api/members", "PUT", { id: editItem.id, ...memberForm });
+        toast?.("Member updated", "success");
+      } else {
+        const data = await apiCall("/api/members", "POST", memberForm);
+        setNewMemberCreds({ name: data.name, email: data.email, password: data.default_password });
+        toast?.("Member added", "success");
+      }
+      setShowMemberForm(false);
+      setEditItem(null);
+      setMemberForm({ name: "", email: "", phone: "", monthly_contribution: 0 });
+      await refreshData();
+    } catch (e) { toast?.(e.message, "error"); }
+    setSubmitting(false);
+  }
+
+  // ── Investments ──
+  async function saveInvestment(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const method = editItem ? "PUT" : "POST";
+      const body = editItem ? { id: editItem.id, ...invForm } : invForm;
+      await apiCall("/api/investments", method, body);
+      toast?.(editItem ? "Investment updated" : "Investment added", "success");
+      setShowInvestmentForm(false);
+      setEditItem(null);
+      setInvForm({ name: "", ticker: "", asset_class: "stocks", quantity: "", cost_basis: "", current_price: "", current_value: "", price_source: "manual", notes: "" });
+      await refreshData();
+    } catch (e) { toast?.(e.message, "error"); }
+    setSubmitting(false);
+  }
+
+  // ── Fines ──
+  async function saveFine(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await apiCall("/api/fines", "POST", fineForm);
+      toast?.("Fine recorded", "success");
+      setShowFineForm(false);
+      setFineForm({ member_id: "", amount: "", reason: "", date: new Date().toISOString().split("T")[0] });
+      await refreshData();
+    } catch (e) { toast?.(e.message, "error"); }
+    setSubmitting(false);
+  }
+
+  async function toggleFinePaid(fine) {
+    try {
+      await apiCall("/api/fines", "PUT", { id: fine.id, is_paid: !fine.is_paid });
+      toast?.(fine.is_paid ? "Marked as unpaid" : "Marked as paid", "success");
+      await refreshData();
+    } catch (e) { toast?.(e.message, "error"); }
+  }
+
+  async function resetPassword(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await apiCall("/api/password", "PUT", resetForm);
+      toast?.("Password reset successfully", "success");
+      setShowPasswordReset(false);
+      setResetForm({ member_id: "", new_password: "" });
+    } catch (e) { toast?.(e.message, "error"); }
+    setSubmitting(false);
+  }
+
+  return (
+    <div className="animate-in">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Admin Panel</h1>
+        <p className="text-sm text-gray-500 mt-1">Manage club operations</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 bg-surface-1 border border-surface-3 rounded-xl p-1 w-fit overflow-x-auto">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (<button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${tab === t.id ? "bg-brand-700 text-white" : "text-gray-400 hover:text-white"}`}><Icon size={16} />{t.label}</button>);
+        })}
+      </div>
+
+      {/* New member credentials modal */}
+      <Modal open={!!newMemberCreds} onClose={() => setNewMemberCreds(null)} title="New Member Created">
+        {newMemberCreds && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-400">Share these login credentials with the new member:</p>
+            <div className="bg-surface-2 rounded-lg p-4 space-y-2 font-mono text-sm">
+              <div><span className="text-gray-500">Name:</span> <span className="text-white">{newMemberCreds.name}</span></div>
+              <div><span className="text-gray-500">Email:</span> <span className="text-white">{newMemberCreds.email}</span></div>
+              <div><span className="text-gray-500">Password:</span> <span className="text-green-400">{newMemberCreds.password}</span></div>
+            </div>
+            <button onClick={() => { navigator.clipboard?.writeText(`Email: ${newMemberCreds.email}\nPassword: ${newMemberCreds.password}`); toast?.("Copied to clipboard", "success"); }}
+              className={`w-full ${btnPrimary} flex items-center justify-center gap-2`}><Copy size={14} />Copy Credentials</button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ═══ VALUATION ═══ */}
+      {tab === "valuation" && (
+        <div className="space-y-4">
+          <div className="card">
+            <h3 className="text-sm font-semibold mb-2">Generate Monthly Valuation</h3>
+            <p className="text-xs text-gray-500 mb-4">Calculates each member's portfolio share from their contributions and current investment values. Run at the start of each month after updating prices.</p>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div><label className="block text-xs text-gray-500 mb-1.5">Date</label><input type="date" value={valDate} onChange={(e) => setValDate(e.target.value)} className={inputClass} style={{ width: 180 }} /></div>
+              <button onClick={generateValuation} disabled={generating} className={`${btnPrimary} px-6 h-[42px] flex items-center gap-2`}>
+                <Calculator size={16} />{generating ? "Generating..." : "Generate"}
+              </button>
+            </div>
+            {valResult && (
+              <div className={`mt-4 p-4 rounded-lg text-sm ${valResult.ok ? "bg-green-900/20 border border-green-800/30 text-green-400" : "bg-red-900/20 border border-red-800/30 text-red-400"}`}>
+                {valResult.ok ? <>Generated for <strong>{valResult.date}</strong> — {fmtUGX(valResult.totalPortfolioValue)} across {valResult.membersProcessed} members</> : valResult.error}
+              </div>
+            )}
+          </div>
+          <div className="card">
+            <h3 className="text-sm font-semibold mb-3">History</h3>
+            {snapshots.length === 0 ? <div className="py-4 text-center text-gray-500 text-sm">No valuations yet</div> : (
+              <div className="divide-y divide-surface-3">{snapshots.slice(0, 12).map((s) => (
+                <div key={s.id} className="flex justify-between items-center py-2.5 text-sm">
+                  <span className="font-mono text-gray-400">{fmtDate(s.date)}</span>
+                  <span className="font-mono font-semibold">{fmtUGX(s.total_value)}</span>
+                  <span className={`text-xs font-semibold ${s.total_value >= s.total_invested ? "text-green-400" : "text-red-400"}`}>{s.total_invested > 0 ? `${(((s.total_value - s.total_invested) / s.total_invested) * 100).toFixed(1)}%` : "-"}</span>
+                </div>
+              ))}</div>
+            )}
+          </div>
+          <div className="card">
+            <h3 className="text-sm font-semibold mb-3">Current Portfolio: <span className="font-mono">{fmtUGX(totalPortfolioValue)}</span></h3>
+            <div className="space-y-2">{ASSET_CLASSES.map((cls) => {
+              const value = activeInvestments.filter((i) => i.asset_class === cls).reduce((s, i) => s + (i.current_value || 0), 0);
+              if (!value) return null;
+              return (<div key={cls} className="flex justify-between text-sm"><span className="text-gray-400">{ASSET_CLASS_LABELS[cls]}</span><span className="font-mono">{fmtUGX(value)} <span className="text-gray-500 text-xs">({((value / totalPortfolioValue) * 100).toFixed(1)}%)</span></span></div>);
+            })}</div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MEMBERS ═══ */}
+      {tab === "members" && (
+        <div>
+          <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
+            <span className="text-sm text-gray-500">{members.length} members</span>
+            <div className="flex gap-2">
+              <button onClick={() => { setResetForm({ member_id: "", new_password: "" }); setShowPasswordReset(true); }} className={`${btnSecondary} px-3 flex items-center gap-2 text-xs`}><Key size={14} />Reset Password</button>
+              <button onClick={() => { setEditItem(null); setMemberForm({ name: "", email: "", phone: "", monthly_contribution: 0 }); setShowMemberForm(true); }} className={`${btnPrimary} px-3 flex items-center gap-2 text-xs`}><Plus size={14} />Add Member</button>
+            </div>
+          </div>
+          <div className="card p-0 overflow-hidden">{members.map((m) => (
+            <div key={m.id} className="flex items-center justify-between px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors">
+              <div><div className="text-sm font-medium">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div><div className="text-[11px] text-gray-500">{m.email} · {m.phone || "—"}</div></div>
+              <div className="text-right text-xs text-gray-400 hidden sm:block">Monthly: {m.monthly_contribution > 0 ? fmtUGX(m.monthly_contribution) : "None"}</div>
+              <button onClick={() => { setEditItem(m); setMemberForm({ name: m.name, email: m.email, phone: m.phone || "", monthly_contribution: m.monthly_contribution || 0 }); setShowMemberForm(true); }}
+                className="p-1.5 rounded hover:bg-surface-3 text-gray-400 hover:text-white"><Pencil size={14} /></button>
+            </div>
+          ))}</div>
+
+          <Modal open={showMemberForm} onClose={() => { setShowMemberForm(false); setEditItem(null); }} title={editItem ? "Edit Member" : "Add Member"}>
+            <form onSubmit={saveMember} className="space-y-1">
+              <FormField label="Full Name"><input value={memberForm.name} onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} required className={inputClass} placeholder="e.g. JOHN DOE" /></FormField>
+              <FormField label="Email"><input type="email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} required className={inputClass} placeholder="john.doe@gm06.club" /></FormField>
+              <FormField label="Phone"><input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} className={inputClass} placeholder="256700000000" /></FormField>
+              <FormField label="Monthly Contribution (UGX)"><input type="number" value={memberForm.monthly_contribution} onChange={(e) => setMemberForm({ ...memberForm, monthly_contribution: parseFloat(e.target.value) || 0 })} className={inputClass} /></FormField>
+              {!editItem && <p className="text-xs text-gray-500 pt-1">Default password: gm06-{"{"} last 4 digits of phone {"}"}</p>}
+              <div className="flex gap-3 pt-2"><button type="button" onClick={() => { setShowMemberForm(false); setEditItem(null); }} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Saving..." : "Save"}</button></div>
+            </form>
+          </Modal>
+
+          <Modal open={showPasswordReset} onClose={() => setShowPasswordReset(false)} title="Reset Member Password">
+            <form onSubmit={resetPassword} className="space-y-1">
+              <FormField label="Member"><select value={resetForm.member_id} onChange={(e) => setResetForm({ ...resetForm, member_id: e.target.value })} required className={selectClass}><option value="">Select...</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</option>)}</select></FormField>
+              <FormField label="New Password"><input type="text" value={resetForm.new_password} onChange={(e) => setResetForm({ ...resetForm, new_password: e.target.value })} required minLength={6} className={inputClass} placeholder="Minimum 6 characters" /></FormField>
+              <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowPasswordReset(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Resetting..." : "Reset Password"}</button></div>
+            </form>
+          </Modal>
+        </div>
+      )}
+
+      {/* ═══ INVESTMENTS ═══ */}
+      {tab === "investments" && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm text-gray-500">{activeInvestments.length} investments · {fmtUGX(totalPortfolioValue)}</span>
+            <button onClick={() => { setEditItem(null); setInvForm({ name: "", ticker: "", asset_class: "stocks", quantity: "", cost_basis: "", current_price: "", current_value: "", price_source: "manual", notes: "" }); setShowInvestmentForm(true); }}
+              className={`${btnPrimary} px-3 flex items-center gap-2 text-xs`}><Plus size={14} />Add</button>
+          </div>
+          {ASSET_CLASSES.map((cls) => {
+            const clsInv = activeInvestments.filter((i) => i.asset_class === cls);
+            if (!clsInv.length) return null;
+            return (
+              <div key={cls} className="card p-0 overflow-hidden mb-4">
+                <div className="px-5 py-3 border-b border-surface-3 flex justify-between items-center bg-surface-2"><span className="text-sm font-semibold">{ASSET_CLASS_LABELS[cls]}</span><span className="text-sm font-mono">{fmtUGX(clsInv.reduce((s, i) => s + (i.current_value || 0), 0))}</span></div>
+                <div className="overflow-x-auto">{clsInv.map((inv) => (
+                  <div key={inv.id} className="grid grid-cols-6 items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
+                    <div><div className="font-medium">{inv.name}</div>{inv.ticker && <div className="text-[11px] text-gray-500">{inv.ticker}</div>}</div>
+                    <div className="text-right font-mono text-gray-400">{Number(inv.quantity).toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
+                    <div className="text-right font-mono text-gray-400">{fmtShort(inv.cost_basis)}</div>
+                    <div className="text-right font-mono font-semibold">{fmtShort(inv.current_value)}</div>
+                    <div className="text-right text-[11px] text-gray-500">{inv.price_source}</div>
+                    <div className="text-right"><button onClick={() => { setEditItem(inv); setInvForm({ name: inv.name, ticker: inv.ticker || "", asset_class: inv.asset_class, quantity: inv.quantity, cost_basis: inv.cost_basis, current_price: inv.current_price, current_value: inv.current_value, price_source: inv.price_source, notes: inv.notes || "" }); setShowInvestmentForm(true); }} className="p-1.5 rounded hover:bg-surface-3 text-gray-400 hover:text-white"><Pencil size={14} /></button></div>
+                  </div>
+                ))}</div>
+              </div>
+            );
+          })}
+          <Modal open={showInvestmentForm} onClose={() => { setShowInvestmentForm(false); setEditItem(null); }} title={editItem ? "Edit Investment" : "Add Investment"} wide>
+            <form onSubmit={saveInvestment} className="space-y-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="Name"><input value={invForm.name} onChange={(e) => setInvForm({ ...invForm, name: e.target.value })} required className={inputClass} /></FormField>
+                <FormField label="Ticker"><input value={invForm.ticker} onChange={(e) => setInvForm({ ...invForm, ticker: e.target.value })} className={inputClass} placeholder="e.g. BTC" /></FormField>
+                <FormField label="Asset Class"><select value={invForm.asset_class} onChange={(e) => setInvForm({ ...invForm, asset_class: e.target.value })} className={selectClass}>{ASSET_CLASSES.map((c) => <option key={c} value={c}>{ASSET_CLASS_LABELS[c]}</option>)}</select></FormField>
+                <FormField label="Price Source"><select value={invForm.price_source} onChange={(e) => setInvForm({ ...invForm, price_source: e.target.value })} className={selectClass}><option value="manual">Manual</option><option value="binance">Binance API</option><option value="uap">UAP Fund</option></select></FormField>
+                <FormField label="Quantity"><input type="number" step="any" value={invForm.quantity} onChange={(e) => setInvForm({ ...invForm, quantity: e.target.value })} className={inputClass} /></FormField>
+                <FormField label="Cost Basis (UGX)"><input type="number" step="any" value={invForm.cost_basis} onChange={(e) => setInvForm({ ...invForm, cost_basis: e.target.value })} className={inputClass} /></FormField>
+                <FormField label="Current Price (UGX)"><input type="number" step="any" value={invForm.current_price} onChange={(e) => { const p = parseFloat(e.target.value) || 0; const q = parseFloat(invForm.quantity) || 0; setInvForm({ ...invForm, current_price: e.target.value, current_value: String(Math.round(p * q * 100) / 100) }); }} className={inputClass} /></FormField>
+                <FormField label="Current Value (UGX)"><input type="number" step="any" value={invForm.current_value} onChange={(e) => setInvForm({ ...invForm, current_value: e.target.value })} className={inputClass} /></FormField>
+              </div>
+              <FormField label="Notes"><input value={invForm.notes} onChange={(e) => setInvForm({ ...invForm, notes: e.target.value })} className={inputClass} /></FormField>
+              <div className="flex gap-3 pt-2"><button type="button" onClick={() => { setShowInvestmentForm(false); setEditItem(null); }} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Saving..." : "Save"}</button></div>
+            </form>
+          </Modal>
+        </div>
+      )}
+
+      {/* ═══ FINES ═══ */}
+      {tab === "fines" && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm text-gray-500">{fines.length} fines · Unpaid: {fmtUGX(fines.filter((f) => !f.is_paid).reduce((s, f) => s + f.amount, 0))}</span>
+            <button onClick={() => setShowFineForm(true)} className={`${btnPrimary} px-3 flex items-center gap-2 text-xs`}><Plus size={14} />Record Fine</button>
+          </div>
+          <div className="card p-0 overflow-hidden">
+            {fines.length === 0 ? <div className="px-5 py-8 text-center text-gray-500 text-sm">No fines recorded</div> : (
+              <div className="overflow-x-auto">{fines.map((f) => (
+                <div key={f.id} className="grid grid-cols-5 items-center px-5 py-3 border-b border-surface-3 text-[13px] hover:bg-surface-2 transition-colors">
+                  <div className="font-mono text-gray-400">{fmtDate(f.date)}</div>
+                  <div>{f.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "—"}</div>
+                  <div className="text-gray-400 text-xs truncate">{f.reason}</div>
+                  <div className="text-right font-mono font-semibold text-amber-400">{fmtUGX(f.amount)}</div>
+                  <div className="text-right"><button onClick={() => toggleFinePaid(f)} className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${f.is_paid ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{f.is_paid ? "Paid" : "Unpaid"}</button></div>
+                </div>
+              ))}</div>
+            )}
+          </div>
+          <Modal open={showFineForm} onClose={() => setShowFineForm(false)} title="Record Fine">
+            <form onSubmit={saveFine} className="space-y-1">
+              <FormField label="Member"><select value={fineForm.member_id} onChange={(e) => setFineForm({ ...fineForm, member_id: e.target.value })} required className={selectClass}><option value="">Select...</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</option>)}</select></FormField>
+              <FormField label="Amount (UGX)"><input type="number" value={fineForm.amount} onChange={(e) => setFineForm({ ...fineForm, amount: e.target.value })} required min="1" className={inputClass} /></FormField>
+              <FormField label="Reason"><select value={fineForm.reason} onChange={(e) => setFineForm({ ...fineForm, reason: e.target.value })} required className={selectClass}><option value="">Select...</option><option value="Late payment">Late payment</option><option value="Missing a meeting">Missing a meeting</option><option value="Disrupting a meeting">Disrupting a meeting</option><option value="Late coming">Late coming</option><option value="Other">Other</option></select></FormField>
+              <FormField label="Date"><input type="date" value={fineForm.date} onChange={(e) => setFineForm({ ...fineForm, date: e.target.value })} required className={inputClass} /></FormField>
+              <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowFineForm(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Recording..." : "Record"}</button></div>
+            </form>
+          </Modal>
+        </div>
+      )}
+    </div>
+  );
+}
