@@ -76,17 +76,45 @@ export default function LoansPage() {
 
   return (
     <div className="animate-in">
-      <div className="flex justify-between items-center mb-7">
-        <div>
-          <h1 className="text-2xl font-bold">Loans</h1>
-          <p className="text-sm text-gray-500 mt-1">Request and manage your loans</p>
-        </div>
-        {!activeLoan && portfolioValue > 0 && (
-          <button onClick={() => setShowRequest(true)} className={`${btnPrimary} px-4 flex items-center gap-2`}>
-            <Plus size={14} /> Request a Loan
-          </button>
-        )}
+      <div className="mb-7">
+        <h1 className="text-2xl font-bold">Loans</h1>
+        <p className="text-sm text-gray-500 mt-1">Request and manage your loans</p>
       </div>
+
+      {/* Loan Eligibility — shown when no active loan */}
+      {!activeLoan && (
+        <div className="card mb-6" style={{ borderColor: "rgba(15,118,110,0.2)" }}>
+          <div className="flex items-center gap-2 mb-4">
+            <Landmark size={18} className="text-brand-500" />
+            <span className="text-sm font-semibold">Loan Eligibility</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div>
+              <div className="text-xs text-gray-500">Your Portfolio</div>
+              <div className="text-lg font-bold font-mono">{fmtUGX(portfolioValue)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Max Borrowable ({maxPct}%)</div>
+              <div className="text-lg font-bold font-mono text-brand-500">{fmtUGX(maxAmount)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Interest Rate</div>
+              <div className="text-lg font-bold font-mono">{interestRate}%</div>
+              <div className="text-[11px] text-gray-500">per annum</div>
+            </div>
+            <div className="flex items-end">
+              {portfolioValue > 0 ? (
+                <button onClick={() => setShowRequest(true)} className={`w-full ${btnPrimary} flex items-center justify-center gap-2`}>
+                  <Plus size={14} /> Request a Loan
+                </button>
+              ) : (
+                <div className="text-xs text-gray-500">No portfolio value yet</div>
+              )}
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-500">Loans require approval from 2 admins. Repayments are automatically deducted from your monthly contributions.</p>
+        </div>
+      )}
 
       {/* Active Loan */}
       {activeLoan && (
@@ -143,14 +171,6 @@ export default function LoansPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {!activeLoan && (
-        <div className="card mb-6 text-center py-8">
-          <Landmark size={32} className="text-gray-600 mx-auto mb-3" />
-          <div className="text-sm text-gray-400 mb-1">No active loan</div>
-          <div className="text-xs text-gray-500">You can borrow up to <span className="text-white font-mono">{fmtUGX(maxAmount)}</span> ({maxPct}% of your portfolio)</div>
         </div>
       )}
 
