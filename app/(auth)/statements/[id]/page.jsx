@@ -24,6 +24,14 @@ export default function StatementPage() {
   const gain = s.portfolio_value - s.total_invested;
   const returnPct = s.total_invested > 0 ? ((gain / s.total_invested) * 100).toFixed(1) : 0;
 
+  // This month's contributions
+  const now = new Date();
+  const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const nextMonthStart = now.getMonth() === 11 ? `${now.getFullYear() + 1}-01-01` : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, "0")}-01`;
+  const thisMonthContribs = (data.contributions || []).filter((c) => c.type === "deposit" && c.date >= currentMonthStart && c.date < nextMonthStart);
+  const thisMonthTotal = thisMonthContribs.reduce((s, c) => s + c.amount, 0);
+  const generatedAt = now.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }) + " at " + now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
   return (
     <>
       <style>{`
@@ -67,6 +75,7 @@ export default function StatementPage() {
           <div><span style={{ color: "#888", fontSize: 12 }}>Total Invested</span><br /><strong>{fmtUGX(s.total_invested)}</strong></div>
           <div><span style={{ color: "#888", fontSize: 12 }}>Total Return</span><br /><strong style={{ color: "#059669" }}>{returnPct}%</strong></div>
           <div><span style={{ color: "#888", fontSize: 12 }}>Monthly Contribution</span><br /><strong>{fmtUGX(m.monthly_contribution)}</strong></div>
+          <div><span style={{ color: "#888", fontSize: 12 }}>Contributed This Month</span><br /><strong style={{ color: thisMonthTotal > 0 ? "#059669" : "#dc2626" }}>{thisMonthTotal > 0 ? fmtUGX(thisMonthTotal) : "Not yet paid"}</strong></div>
         </div>
 
         {/* Holdings Table */}
@@ -106,8 +115,10 @@ export default function StatementPage() {
         </p>
 
         {/* Footer */}
-        <div style={{ marginTop: 30, paddingTop: 16, borderTop: "1px solid #e5e7eb", fontSize: 11, color: "#aaa", textAlign: "center" }}>
-          GM06 Investment Club · Individual Statement · Confidential
+        <div style={{ marginTop: 30, paddingTop: 16, borderTop: "1px solid #e5e7eb", textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: "#aaa" }}>Generated on {generatedAt}</div>
+          <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>GM06 Investment Club · Individual Statement · Confidential</div>
+          <div style={{ fontSize: 11, color: "#888", marginTop: 8 }}>For any queries, contact the Treasurer at greenminds06investmentclub@gmail.com</div>
         </div>
       </div>
     </>

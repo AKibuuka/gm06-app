@@ -29,7 +29,13 @@ function StatementModal({ member, onClose }) {
 
         {loading ? (
           <div className="py-16 text-center text-gray-400">Loading statement...</div>
-        ) : data?.snapshot ? (
+        ) : data?.snapshot ? (() => {
+          const now = new Date();
+          const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+          const nextMonthStart = now.getMonth() === 11 ? `${now.getFullYear() + 1}-01-01` : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, "0")}-01`;
+          const thisMonthContribs = (data.contributions || []).filter((c) => c.type === "deposit" && c.date >= currentMonthStart && c.date < nextMonthStart);
+          const thisMonthTotal = thisMonthContribs.reduce((s, c) => s + c.amount, 0);
+          return (
           <>
             <div className="text-center mb-6">
               <div className="text-[11px] text-gray-400 tracking-wide">{fmtDate(data.date)}</div>
@@ -46,6 +52,7 @@ function StatementModal({ member, onClose }) {
                 <div><span className="text-gray-500 text-xs">Total Invested</span><br /><strong>{fmtUGX(data.snapshot.total_invested)}</strong></div>
                 <div><span className="text-gray-500 text-xs">Total Return</span><br /><strong className="text-green-600">{data.snapshot.total_invested > 0 ? (((data.snapshot.portfolio_value - data.snapshot.total_invested) / data.snapshot.total_invested) * 100).toFixed(1) : 0}%</strong></div>
                 <div><span className="text-gray-500 text-xs">Monthly Contribution</span><br /><strong>{fmtUGX(data.member.monthly_contribution)}</strong></div>
+                <div><span className="text-gray-500 text-xs">Contributed This Month</span><br /><strong className={thisMonthTotal > 0 ? "text-green-600" : "text-red-600"}>{thisMonthTotal > 0 ? fmtUGX(thisMonthTotal) : "Not yet paid"}</strong></div>
               </div>
             </div>
 
@@ -78,8 +85,13 @@ function StatementModal({ member, onClose }) {
               <strong>Advance Contribution:</strong> {fmtUGX(data.snapshot.advance_contribution)}
             </div>
             <p className="text-[10px] text-gray-400 text-center mt-3">Valuations may include unrealised profits/losses.</p>
+            <div className="mt-4 pt-3 border-t border-gray-200 text-center">
+              <p className="text-[10px] text-gray-400">Generated on {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })} at {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</p>
+              <p className="text-[10px] text-gray-400 mt-1">For any queries, contact the Treasurer at greenminds06investmentclub@gmail.com</p>
+            </div>
           </>
-        ) : (
+          );
+        })() : (
           <div className="py-16 text-center text-gray-400">No statement data available for this period.</div>
         )}
       </div>
