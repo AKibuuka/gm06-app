@@ -96,7 +96,6 @@ export async function PUT(request) {
 
   // Don't allow updating password_hash through this endpoint
   delete updates.password_hash;
-  delete updates.role; // Role changes need separate handling
 
   const db = getServiceClient();
   const { data, error } = await db.from("members")

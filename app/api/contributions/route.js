@@ -42,7 +42,7 @@ export async function POST(request) {
   }
 
   const body = await request.json();
-  const { member_id, amount, type, description, date } = body;
+  const { member_id, amount, type, description, date, bank_ref } = body;
 
   if (!member_id || !amount || !type) {
     return NextResponse.json({ error: "member_id, amount, and type are required" }, { status: 400 });
@@ -60,12 +60,18 @@ export async function POST(request) {
       amount: parseFloat(amount),
       type,
       description: description || null,
+      bank_ref: bank_ref || null,
       date: date || new Date().toISOString().split("T")[0],
     })
     .select("*, members(name)")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    if (error.code === "23505" && error.message?.includes("bank_ref")) {
+      return NextResponse.json({ error: `Duplicate bank reference: ${bank_ref} already exists` }, { status: 400 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
 
   return NextResponse.json(data);
 }

@@ -39,7 +39,7 @@ export default function AdminPage() {
   const [editItem, setEditItem] = useState(null);
 
   // Forms
-  const [memberForm, setMemberForm] = useState({ name: "", email: "", phone: "", monthly_contribution: 0 });
+  const [memberForm, setMemberForm] = useState({ name: "", email: "", phone: "", monthly_contribution: 0, role: "member" });
   const [invForm, setInvForm] = useState({ name: "", ticker: "", asset_class: "stocks", quantity: "", cost_basis: "", current_price: "", current_value: "", price_source: "manual", notes: "" });
   const [fineForm, setFineForm] = useState({ member_id: "", amount: "", reason: "", date: new Date().toISOString().split("T")[0] });
   const [resetForm, setResetForm] = useState({ member_id: "", new_password: "" });
@@ -118,7 +118,7 @@ export default function AdminPage() {
       }
       setShowMemberForm(false);
       setEditItem(null);
-      setMemberForm({ name: "", email: "", phone: "", monthly_contribution: 0 });
+      setMemberForm({ name: "", email: "", phone: "", monthly_contribution: 0, role: "member" });
       await refreshData();
     } catch (e) { toast?.(e.message, "error"); }
     setSubmitting(false);
@@ -254,14 +254,17 @@ export default function AdminPage() {
             <span className="text-sm text-gray-500">{members.length} members</span>
             <div className="flex gap-2">
               <button onClick={() => { setResetForm({ member_id: "", new_password: "" }); setShowPasswordReset(true); }} className={`${btnSecondary} px-3 flex items-center gap-2 text-xs`}><Key size={14} />Reset Password</button>
-              <button onClick={() => { setEditItem(null); setMemberForm({ name: "", email: "", phone: "", monthly_contribution: 0 }); setShowMemberForm(true); }} className={`${btnPrimary} px-3 flex items-center gap-2 text-xs`}><Plus size={14} />Add Member</button>
+              <button onClick={() => { setEditItem(null); setMemberForm({ name: "", email: "", phone: "", monthly_contribution: 0, role: "member" }); setShowMemberForm(true); }} className={`${btnPrimary} px-3 flex items-center gap-2 text-xs`}><Plus size={14} />Add Member</button>
             </div>
           </div>
           <div className="card p-0 overflow-hidden">{members.map((m) => (
             <div key={m.id} className="flex items-center justify-between px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors">
-              <div><div className="text-sm font-medium">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div><div className="text-[11px] text-gray-500">{m.email} · {m.phone || "—"}</div></div>
+              <div>
+                <div className="text-sm font-medium flex items-center gap-2">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}{m.role === "admin" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-700/20 text-brand-500 font-semibold">Admin</span>}</div>
+                <div className="text-[11px] text-gray-500">{m.email} · {m.phone || "—"}</div>
+              </div>
               <div className="text-right text-xs text-gray-400 hidden sm:block">Monthly: {m.monthly_contribution > 0 ? fmtUGX(m.monthly_contribution) : "None"}</div>
-              <button onClick={() => { setEditItem(m); setMemberForm({ name: m.name, email: m.email, phone: m.phone || "", monthly_contribution: m.monthly_contribution || 0 }); setShowMemberForm(true); }}
+              <button onClick={() => { setEditItem(m); setMemberForm({ name: m.name, email: m.email, phone: m.phone || "", monthly_contribution: m.monthly_contribution || 0, role: m.role || "member" }); setShowMemberForm(true); }}
                 className="p-1.5 rounded hover:bg-surface-3 text-gray-400 hover:text-white"><Pencil size={14} /></button>
             </div>
           ))}</div>
@@ -272,6 +275,14 @@ export default function AdminPage() {
               <FormField label="Email"><input type="email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} required className={inputClass} placeholder="john.doe@gm06.club" /></FormField>
               <FormField label="Phone"><input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} className={inputClass} placeholder="256700000000" /></FormField>
               <FormField label="Monthly Contribution (UGX)"><input type="number" value={memberForm.monthly_contribution} onChange={(e) => setMemberForm({ ...memberForm, monthly_contribution: parseFloat(e.target.value) || 0 })} className={inputClass} /></FormField>
+              {editItem && (
+                <FormField label="Role">
+                  <select value={memberForm.role} onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })} className={selectClass}>
+                    <option value="member">Member</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </FormField>
+              )}
               {!editItem && <p className="text-xs text-gray-500 pt-1">Default password: gm06-{"{"} last 4 digits of phone {"}"}</p>}
               <div className="flex gap-3 pt-2"><button type="button" onClick={() => { setShowMemberForm(false); setEditItem(null); }} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Saving..." : "Save"}</button></div>
             </form>

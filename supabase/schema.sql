@@ -24,9 +24,13 @@ create table contributions (
   amount numeric(15,2) not null,
   type text not null check (type in ('deposit', 'fine', 'expense', 'withdrawal')),
   description text,
+  bank_ref text,
   date date not null default current_date,
   created_at timestamptz default now()
 );
+
+-- Prevent duplicate bank deposits
+create unique index idx_contributions_bank_ref on contributions(bank_ref) where bank_ref is not null;
 
 -- 3. Investments (each asset the club holds)
 create table investments (

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
+import { useToast } from "@/components/Toast";
 import { Plus, DollarSign, ArrowDown, ArrowUp, AlertTriangle } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import { fmtUGX, fmtShort, fmtDate } from "@/lib/format";
@@ -14,6 +15,7 @@ const TYPE_STYLES = {
 
 export default function ContributionsPage() {
   const user = useUser();
+  const toast = useToast();
   const isAdmin = user?.role === "admin";
 
   const [contributions, setContributions] = useState([]);
@@ -23,9 +25,10 @@ export default function ContributionsPage() {
   const [showBatch, setShowBatch] = useState(false);
   const [filterType, setFilterType] = useState("");
   const [filterMember, setFilterMember] = useState("");
-  const [form, setForm] = useState({ member_id: "", amount: "", type: "deposit", description: "", date: new Date().toISOString().split("T")[0] });
+  const [form, setForm] = useState({ member_id: "", amount: "", type: "deposit", description: "", bank_ref: "", date: new Date().toISOString().split("T")[0] });
   const [batchDate, setBatchDate] = useState(new Date().toISOString().split("T")[0]);
   const [batchAmounts, setBatchAmounts] = useState({});
+  const [batchRefs, setBatchRefs] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -54,7 +57,7 @@ export default function ContributionsPage() {
       const data = await res.json();
       setContributions([data, ...contributions]);
       setShowAdd(false);
-      setForm({ member_id: "", amount: "", type: "deposit", description: "", date: new Date().toISOString().split("T")[0] });
+      setForm({ member_id: "", amount: "", type: "deposit", description: "", bank_ref: "", date: new Date().toISOString().split("T")[0] });
     } else { alert((await res.json()).error); }
     setSubmitting(false);
   }
@@ -66,12 +69,13 @@ export default function ContributionsPage() {
     for (const [member_id, amount] of entries) {
       const res = await fetch("/api/contributions", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ member_id, amount, type: "deposit", description: `Monthly contribution`, date: batchDate }),
+        body: JSON.stringify({ member_id, amount, type: "deposit", description: `Monthly contribution`, bank_ref: batchRefs[member_id] || null, date: batchDate }),
       });
       if (res.ok) results.push(await res.json());
+      else { const err = await res.json(); toast?.(`${err.error}`, "error"); }
     }
     setContributions([...results, ...contributions]);
-    setShowBatch(false); setBatchAmounts({}); setSubmitting(false);
+    setShowBatch(false); setBatchAmounts({}); setBatchRefs({}); setSubmitting(false);
   }
 
   if (loading) return <div className="text-gray-500 text-sm p-8">Loading...</div>;
@@ -114,8 +118,8 @@ export default function ContributionsPage() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <div className={`grid ${isAdmin ? "grid-cols-5" : "grid-cols-4"} items-center px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide`}>
-          <span>DATE</span>{isAdmin && <span>MEMBER</span>}<span>TYPE</span><span className="text-right">AMOUNT</span><span>DESCRIPTION</span>
+        <div className={`grid ${isAdmin ? "grid-cols-6" : "grid-cols-5"} items-center px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide`}>
+          <span>DATE</span>{isAdmin && <span>MEMBER</span>}<span>TYPE</span><span className="text-right">AMOUNT</span><span>BANK REF</span><span>DESCRIPTION</span>
         </div>
         {filtered.length === 0 ? (
           <div className="px-5 py-12 text-center text-gray-500 text-sm">No contributions found</div>
@@ -124,11 +128,12 @@ export default function ContributionsPage() {
             const style = TYPE_STYLES[c.type] || TYPE_STYLES.deposit;
             const Icon = style.icon;
             return (
-              <div key={c.id} className={`grid ${isAdmin ? "grid-cols-5" : "grid-cols-4"} items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]`}>
+              <div key={c.id} className={`grid ${isAdmin ? "grid-cols-6" : "grid-cols-5"} items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]`}>
                 <div className="font-mono text-gray-400">{fmtDate(c.date)}</div>
                 {isAdmin && <div className="font-medium">{c.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "—"}</div>}
                 <div><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${style.bg}`}><Icon size={10} />{c.type}</span></div>
                 <div className="text-right font-mono font-semibold">{fmtUGX(c.amount)}</div>
+                <div className="text-gray-500 text-xs font-mono truncate">{c.bank_ref || "—"}</div>
                 <div className="text-gray-500 text-xs truncate">{c.description || "—"}</div>
               </div>
             );
@@ -143,6 +148,7 @@ export default function ContributionsPage() {
           <FormField label="Type"><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className={selectClass}><option value="deposit">Deposit</option><option value="expense">Expense</option><option value="withdrawal">Withdrawal</option></select></FormField>
           <FormField label="Amount (UGX)"><input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required min="1" className={inputClass} /></FormField>
           <FormField label="Date"><input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required className={inputClass} /></FormField>
+          <FormField label="Bank Reference"><input type="text" value={form.bank_ref} onChange={(e) => setForm({ ...form, bank_ref: e.target.value })} className={inputClass} placeholder="e.g. TXN-20260401-001" /></FormField>
           <FormField label="Description"><input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="e.g. April 2026 deposit" /></FormField>
           <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowAdd(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Saving..." : "Record"}</button></div>
         </form>
@@ -156,9 +162,10 @@ export default function ContributionsPage() {
           <div className="space-y-2 max-h-80 overflow-auto mb-4">
             {members.map((m) => (
               <div key={m.id} className="flex items-center gap-3">
-                <div className="w-44 text-sm truncate">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
-                <input type="number" min="0" value={batchAmounts[m.id] || ""} onChange={(e) => setBatchAmounts({ ...batchAmounts, [m.id]: parseFloat(e.target.value) || 0 })} className={`flex-1 ${inputClass}`} placeholder={m.monthly_contribution > 0 ? `Suggested: ${m.monthly_contribution.toLocaleString()}` : "0"} />
-                {m.monthly_contribution > 0 && <button type="button" onClick={() => setBatchAmounts({ ...batchAmounts, [m.id]: m.monthly_contribution })} className="text-[10px] text-brand-500 hover:text-brand-400 whitespace-nowrap">Use default</button>}
+                <div className="w-36 text-sm truncate">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
+                <input type="number" min="0" value={batchAmounts[m.id] || ""} onChange={(e) => setBatchAmounts({ ...batchAmounts, [m.id]: parseFloat(e.target.value) || 0 })} className={`w-32 ${inputClass}`} placeholder={m.monthly_contribution > 0 ? `${m.monthly_contribution.toLocaleString()}` : "0"} />
+                <input type="text" value={batchRefs[m.id] || ""} onChange={(e) => setBatchRefs({ ...batchRefs, [m.id]: e.target.value })} className={`flex-1 ${inputClass}`} placeholder="Bank ref" />
+                {m.monthly_contribution > 0 && <button type="button" onClick={() => setBatchAmounts({ ...batchAmounts, [m.id]: m.monthly_contribution })} className="text-[10px] text-brand-500 hover:text-brand-400 whitespace-nowrap">Default</button>}
               </div>
             ))}
           </div>

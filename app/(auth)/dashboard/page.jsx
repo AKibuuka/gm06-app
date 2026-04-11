@@ -211,9 +211,27 @@ function AdminDashboard() {
     label: ASSET_CLASS_LABELS[cls] || cls, pct: data.percentage || 0, color: ASSET_CLASS_COLORS[cls] || "#666", value: data.value,
   })).filter((s) => s.pct > 0);
 
+  // Check if monthly contributions are due
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const latestSnapshotDate = members[0]?.snapshot_date;
+  const snapshotMonth = latestSnapshotDate ? latestSnapshotDate.slice(0, 7) : null;
+  const contributionsDue = !snapshotMonth || snapshotMonth < currentMonthStr;
+
   return (
     <div className="animate-in">
       <div className="mb-7"><h1 className="text-2xl font-bold">Club Dashboard</h1><p className="text-sm text-gray-500 mt-1">{CLUB_SHORT} Investment Club overview</p></div>
+
+      {contributionsDue && (
+        <div className="card mb-6 flex items-center gap-3" style={{ borderColor: "rgba(217,119,6,0.3)", background: "rgba(120,53,15,0.1)" }}>
+          <AlertTriangle size={18} className="text-amber-400 shrink-0" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-amber-400">Monthly contributions due</div>
+            <div className="text-xs text-gray-400">Record member contributions for {now.toLocaleDateString("en-GB", { month: "long", year: "numeric" })} and run a valuation.</div>
+          </div>
+          <a href="/contributions" className="bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap">Record Now</a>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Portfolio Value" value={fmtUGX(totalValue)} sub={`+${returnPct}% return`} color="#22C55E" />

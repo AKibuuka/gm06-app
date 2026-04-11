@@ -37,10 +37,10 @@ export async function GET(request) {
     }
 
     case "contributions": {
-      const { data } = await db.from("contributions").select("date, amount, type, description, members(name)").order("date", { ascending: false }).limit(1000);
-      csv = "Date,Member,Type,Amount,Description\n";
+      const { data } = await db.from("contributions").select("date, amount, type, description, bank_ref, members(name)").order("date", { ascending: false }).limit(1000);
+      csv = "Date,Member,Type,Amount,Bank Ref,Description\n";
       (data || []).forEach((c) => {
-        csv += `${c.date},"${c.members?.name || ""}",${c.type},${c.amount},"${(c.description || "").replace(/"/g, '""')}"\n`;
+        csv += `${c.date},"${c.members?.name || ""}",${c.type},${c.amount},"${c.bank_ref || ""}","${(c.description || "").replace(/"/g, '""')}"\n`;
       });
       filename = "gm06_contributions.csv";
       break;
