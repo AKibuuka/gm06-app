@@ -1,7 +1,8 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSign, Settings, X, Landmark, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSign, Settings, X, Landmark, MessageSquare, Search, ArrowUpRight } from "lucide-react";
 import { useState, useEffect } from "react";
+import SearchModal from "./SearchModal";
 import { useToast } from "./Toast";
 import { CLUB_SHORT } from "@/lib/constants";
 import Avatar from "./Avatar";
@@ -11,6 +12,7 @@ const NAV = [
   { href: "/contributions", label: "Contributions", icon: DollarSign },
   { href: "/portfolio", label: "Portfolio", icon: PieChart },
   { href: "/loans", label: "Loans", icon: Landmark },
+  { href: "/withdrawals", label: "Withdrawals", icon: ArrowUpRight },
   { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -27,8 +29,19 @@ export default function Sidebar({ user, onClose }) {
   const toast = useToast();
   const [updating, setUpdating] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
 
   const navItems = user?.role === "admin" ? [...NAV, ...ADMIN_NAV] : NAV;
+
+  // Keyboard shortcut: Ctrl+K or Cmd+K to open search
+  useEffect(() => {
+    function handleKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setShowSearch(true); }
+      if (e.key === "Escape") setShowSearch(false);
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   // Fetch unread message count (lightweight endpoint)
   useEffect(() => {
@@ -75,7 +88,13 @@ export default function Sidebar({ user, onClose }) {
         <button onClick={onClose} className="lg:hidden p-1 text-gray-500 hover:text-white"><X size={18} /></button>
       </div>
 
+      <SearchModal open={showSearch} onClose={() => setShowSearch(false)} />
+
       <nav className="flex-1 p-3 space-y-1 overflow-auto">
+        <button onClick={() => setShowSearch(true)}
+          className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm text-gray-500 hover:bg-surface-2 hover:text-gray-300 transition-colors mb-1">
+          <Search size={16} /><span className="flex-1 text-left">Search</span><span className="text-[10px] text-gray-600 bg-surface-2 px-1.5 py-0.5 rounded">⌘K</span>
+        </button>
         {navItems.map((item) => {
           const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
           const Icon = item.icon;

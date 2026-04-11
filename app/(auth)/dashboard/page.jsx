@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { StatCard, DonutChart, Sparkline } from "@/components/Charts";
-import { fmtUGX, fmtShort, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
+import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
 import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Landmark, Wallet, BarChart3, MessageSquare, DollarSign, PieChart } from "lucide-react";
 import { CLUB_SHORT } from "@/lib/constants";
 import useTitle from "@/lib/useTitle";
@@ -317,15 +317,18 @@ function MemberDashboard({ hideHeader = false }) {
 function AdminDashboard() {
   const [members, setMembers] = useState([]);
   const [portfolio, setPortfolio] = useState(null);
+  const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/members").then((r) => r.json()),
       fetch("/api/portfolio").then((r) => r.json()),
-    ]).then(([m, p]) => {
+      fetch("/api/activity").then((r) => r.json()),
+    ]).then(([m, p, a]) => {
       setMembers(Array.isArray(m) ? m : []);
       setPortfolio(p);
+      setActivity(Array.isArray(a) ? a : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -415,6 +418,28 @@ function AdminDashboard() {
           })}
         </div></div>
       </div>
+
+      {/* Activity Feed */}
+      {activity.length > 0 && (
+        <div className="card mt-5">
+          <div className="text-sm font-semibold mb-3">Recent Activity</div>
+          <div className="divide-y divide-surface-3">
+            {activity.slice(0, 10).map((item, i) => (
+              <div key={i} className="flex items-center gap-3 py-2.5">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                  item.icon === "dollar" ? "bg-green-900/30" : item.icon === "landmark" ? "bg-blue-900/30" : "bg-amber-900/30"
+                }`}>
+                  {item.icon === "dollar" && <DollarSign size={14} className="text-green-400" />}
+                  {item.icon === "landmark" && <Landmark size={14} className="text-blue-400" />}
+                  {item.icon === "alert" && <AlertTriangle size={14} className="text-amber-400" />}
+                </div>
+                <div className="flex-1 min-w-0 text-xs text-gray-400 truncate">{titleCase(item.text)}</div>
+                <div className="text-[10px] text-gray-600 shrink-0">{fmtDate(item.date)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
