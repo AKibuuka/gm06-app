@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { useRouter } from "next/navigation";
-import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark } from "lucide-react";
+import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark, Megaphone, Trash2 } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS } from "@/lib/format";
 
@@ -13,6 +13,7 @@ const TABS = [
   { id: "investments", label: "Investments", icon: PieChart },
   { id: "fines", label: "Fines", icon: AlertTriangle },
   { id: "loans", label: "Loans", icon: Landmark },
+  { id: "announcements", label: "Announce", icon: Megaphone },
 ];
 const ASSET_CLASSES = ["fixed_income", "stocks", "digital_assets", "real_estate", "private_equity", "loans", "cash"];
 
@@ -28,6 +29,7 @@ export default function AdminPage() {
   const [investments, setInvestments] = useState([]);
   const [fines, setFines] = useState([]);
   const [loans, setLoans] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [snapshots, setSnapshots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -45,6 +47,8 @@ export default function AdminPage() {
   const [invForm, setInvForm] = useState({ name: "", ticker: "", asset_class: "stocks", quantity: "", cost_basis: "", current_price: "", current_value: "", price_source: "manual", notes: "" });
   const [fineForm, setFineForm] = useState({ member_id: "", amount: "", reason: "", date: new Date().toISOString().split("T")[0] });
   const [resetForm, setResetForm] = useState({ member_id: "", new_password: "" });
+  const [announceForm, setAnnounceForm] = useState({ title: "", body: "", pinned: false });
+  const [showAnnounceForm, setShowAnnounceForm] = useState(false);
   const [valDate, setValDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; });
   const [valResult, setValResult] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -57,12 +61,14 @@ export default function AdminPage() {
       fetch("/api/fines").then((r) => r.json()),
       fetch("/api/snapshots").then((r) => r.json()),
       fetch("/api/loans").then((r) => r.json()),
-    ]).then(([m, i, f, s, l]) => {
+      fetch("/api/announcements").then((r) => r.json()),
+    ]).then(([m, i, f, s, l, a]) => {
       setMembers(Array.isArray(m) ? m : []);
       setInvestments(Array.isArray(i) ? i : []);
       setFines(Array.isArray(f) ? f : []);
       setSnapshots(Array.isArray(s) ? s : []);
       setLoans(Array.isArray(l) ? l : []);
+      setAnnouncements(Array.isArray(a) ? a : []);
       setLoading(false);
     }).catch(() => { toast?.("Failed to load data", "error"); setLoading(false); });
   }, [user]);
@@ -88,12 +94,14 @@ export default function AdminPage() {
       fetch("/api/fines").then((r) => r.json()),
       fetch("/api/snapshots").then((r) => r.json()),
       fetch("/api/loans").then((r) => r.json()),
+      fetch("/api/announcements").then((r) => r.json()),
     ]);
     setMembers(Array.isArray(m) ? m : []);
     setInvestments(Array.isArray(i) ? i : []);
     setFines(Array.isArray(f) ? f : []);
     setSnapshots(Array.isArray(s) ? s : []);
     setLoans(Array.isArray(l) ? l : []);
+    setAnnouncements(Array.isArray(a) ? a : []);
   }
 
   // ── Valuation ──
@@ -482,6 +490,78 @@ export default function AdminPage() {
             )}
 
             {loans.length === 0 && <div className="card text-center py-8 text-gray-500 text-sm">No loan requests yet</div>}
+          </div>
+        );
+      })()}
+
+      {/* ═══ ANNOUNCEMENTS ═══ */}
+      {tab === "announcements" && (() => {
+        async function saveAnnouncement(e) {
+          e.preventDefault();
+          setSubmitting(true);
+          try {
+            await apiCall("/api/announcements", "POST", announceForm);
+            toast?.("Announcement posted", "success");
+            setShowAnnounceForm(false);
+            setAnnounceForm({ title: "", body: "", pinned: false });
+            await refreshData();
+          } catch (e) { toast?.(e.message, "error"); }
+          setSubmitting(false);
+        }
+
+        async function deleteAnnouncement(id) {
+          try {
+            await apiCall("/api/announcements", "DELETE", { id });
+            toast?.("Announcement deleted", "success");
+            await refreshData();
+          } catch (e) { toast?.(e.message, "error"); }
+        }
+
+        return (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-sm text-gray-500">{announcements.length} announcements</span>
+              <button onClick={() => setShowAnnounceForm(true)} className={`${btnPrimary} px-3 flex items-center gap-2 text-xs`}><Plus size={14} />Post Announcement</button>
+            </div>
+
+            {announcements.length === 0 ? (
+              <div className="card text-center py-8 text-gray-500 text-sm">No announcements yet</div>
+            ) : (
+              <div className="space-y-3">
+                {announcements.map((a) => (
+                  <div key={a.id} className="card" style={a.pinned ? { borderColor: "rgba(59,130,246,0.2)" } : {}}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-semibold">{a.title}</span>
+                          {a.pinned && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-900/20 text-blue-400 font-semibold">Pinned</span>}
+                        </div>
+                        <div className="text-xs text-gray-400">{a.body}</div>
+                        <div className="text-[10px] text-gray-600 mt-2">
+                          {a.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")} · {fmtDate(a.created_at)}
+                        </div>
+                      </div>
+                      <button onClick={() => deleteAnnouncement(a.id)} className="p-1.5 rounded hover:bg-red-900/20 text-gray-500 hover:text-red-400 shrink-0"><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Modal open={showAnnounceForm} onClose={() => setShowAnnounceForm(false)} title="Post Announcement">
+              <form onSubmit={saveAnnouncement} className="space-y-1">
+                <FormField label="Title"><input value={announceForm.title} onChange={(e) => setAnnounceForm({ ...announceForm, title: e.target.value })} required className={inputClass} placeholder="e.g. Monthly meeting reminder" /></FormField>
+                <FormField label="Message"><textarea value={announceForm.body} onChange={(e) => setAnnounceForm({ ...announceForm, body: e.target.value })} required rows={4} className={inputClass} placeholder="Write your announcement..." /></FormField>
+                <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer py-1">
+                  <input type="checkbox" checked={announceForm.pinned} onChange={(e) => setAnnounceForm({ ...announceForm, pinned: e.target.checked })} className="rounded" />
+                  Pin this announcement (stays at top)
+                </label>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setShowAnnounceForm(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
+                  <button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Posting..." : "Post"}</button>
+                </div>
+              </form>
+            </Modal>
           </div>
         );
       })()}

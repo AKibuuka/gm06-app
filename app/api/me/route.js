@@ -59,13 +59,47 @@ export async function GET() {
     .limit(1)
     .maybeSingle();
 
-  // Loan settings
-  const { data: loanSettings } = await db
+  // Settings (loan + contribution)
+  const { data: allSettings } = await db
     .from("settings")
     .select("key, value")
-    .in("key", ["max_loan_pct", "loan_interest_rate"]);
-  const loanConfig = {};
-  (loanSettings || []).forEach((s) => { loanConfig[s.key] = s.value; });
+    .in("key", ["max_loan_pct", "loan_interest_rate", "required_contribution"]);
+  const settingsMap = {};
+  (allSettings || []).forEach((s) => { settingsMap[s.key] = s.value; });
+
+  // Contribution status: check if member has contributed this month
+  const now = new Date();
+  const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const nextMonthStart = now.getMonth() === 11
+    ? `${now.getFullYear() + 1}-01-01`
+    : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, "0")}-01`;
+
+  const { data: thisMonthContribs } = await db
+    .from("contributions")
+    .select("amount")
+    .eq("member_id", session.id)
+    .eq("type", "deposit")
+    .gte("date", currentMonthStart)
+    .lt("date", nextMonthStart);
+
+  const requiredAmount = parseFloat(settingsMap.required_contribution) || 0;
+  const thisMonthTotal = (thisMonthContribs || []).reduce((s, c) => s + c.amount, 0);
+  const contributionDue = requiredAmount > 0 && thisMonthTotal < requiredAmount;
+
+  // Unread messages count
+  const { count: unreadMessages } = await db
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("recipient_id", session.id)
+    .eq("is_read", false);
+
+  // Latest announcements (last 5)
+  const { data: announcements } = await db
+    .from("announcements")
+    .select("id, title, body, pinned, created_at, members!announcements_author_id_fkey(name)")
+    .order("pinned", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(5);
 
   return NextResponse.json({
     member,
@@ -76,6 +110,10 @@ export async function GET() {
     unpaid_fines: unpaidFines,
     club_history: clubHistory || [],
     active_loan: activeLoan || null,
-    loan_settings: loanConfig,
+    loan_settings: { max_loan_pct: settingsMap.max_loan_pct, loan_interest_rate: settingsMap.loan_interest_rate },
+    required_contribution: requiredAmount,
+    contribution_status: { required: requiredAmount, paid_this_month: thisMonthTotal, is_due: contributionDue },
+    unread_messages: unreadMessages || 0,
+    announcements: announcements || [],
   });
 }

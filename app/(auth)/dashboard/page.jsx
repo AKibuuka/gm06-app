@@ -4,7 +4,7 @@ import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { StatCard, DonutChart, Sparkline } from "@/components/Charts";
 import { fmtUGX, fmtShort, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
-import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Landmark, Wallet, BarChart3 } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Landmark, Wallet, BarChart3, MessageSquare } from "lucide-react";
 import { CLUB_SHORT } from "@/lib/constants";
 
 function MemberDashboard({ hideHeader = false }) {
@@ -25,7 +25,7 @@ function MemberDashboard({ hideHeader = false }) {
   if (error) return <div className="card border-red-800/30 text-red-400 text-sm">{error}</div>;
   if (!data?.valuation) return <div className="card text-gray-400 text-sm">No portfolio data available yet. The treasurer needs to run a monthly valuation first.</div>;
 
-  const { member, valuation: v, history, contributions, unpaid_fines, club_history, active_loan } = data;
+  const { member, valuation: v, history, contributions, unpaid_fines, club_history, active_loan, contribution_status, announcements } = data;
   const segments = (v.allocation || []).filter((a) => a.pct > 0).map((a) => ({
     label: ASSET_CLASS_LABELS[a.asset_class] || a.asset_class, pct: a.pct, color: ASSET_CLASS_COLORS[a.asset_class] || "#666", value: a.member_value, clubValue: a.club_value,
   }));
@@ -66,6 +66,41 @@ function MemberDashboard({ hideHeader = false }) {
           );
         })}
       </div>
+
+      {/* Notifications */}
+      {contribution_status?.is_due && (
+        <div className="card mb-5 flex items-center gap-3" style={{ borderColor: "rgba(239,68,68,0.3)", background: "rgba(127,29,29,0.1)" }}>
+          <AlertTriangle size={18} className="text-red-400 shrink-0" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-red-400">Contribution due</div>
+            <div className="text-xs text-gray-400">
+              Required: {fmtUGX(contribution_status.required)} — Paid this month: {fmtUGX(contribution_status.paid_this_month)} —
+              Remaining: <span className="text-red-400 font-mono">{fmtUGX(contribution_status.required - contribution_status.paid_this_month)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Announcements */}
+      {announcements?.length > 0 && tab === "personal" && (
+        <div className="space-y-2 mb-5">
+          {announcements.slice(0, 3).map((a) => (
+            <div key={a.id} className="card py-3" style={a.pinned ? { borderColor: "rgba(59,130,246,0.2)" } : {}}>
+              <div className="flex items-start gap-2">
+                <div className="w-6 h-6 rounded bg-brand-700/20 flex items-center justify-center shrink-0 mt-0.5"><MessageSquare size={12} className="text-brand-500" /></div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">{a.title}</span>
+                    {a.pinned && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-900/20 text-blue-400 font-semibold">Pinned</span>}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">{a.body}</div>
+                  <div className="text-[10px] text-gray-600 mt-1">{a.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")} · {new Date(a.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ═══ PERSONAL TAB ═══ */}
       {tab === "personal" && (

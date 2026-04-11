@@ -1,7 +1,7 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSign, Settings, X, Landmark } from "lucide-react";
-import { useState } from "react";
+import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSign, Settings, X, Landmark, MessageSquare } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useToast } from "./Toast";
 import { CLUB_SHORT } from "@/lib/constants";
 
@@ -10,6 +10,7 @@ const NAV = [
   { href: "/contributions", label: "Contributions", icon: DollarSign },
   { href: "/portfolio", label: "Portfolio", icon: PieChart },
   { href: "/loans", label: "Loans", icon: Landmark },
+  { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -24,8 +25,25 @@ export default function Sidebar({ user, onClose }) {
   const router = useRouter();
   const toast = useToast();
   const [updating, setUpdating] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const navItems = user?.role === "admin" ? [...NAV, ...ADMIN_NAV] : NAV;
+
+  // Fetch unread message count
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => { if (d?.unread_messages) setUnreadCount(d.unread_messages); })
+      .catch(() => {});
+    // Refresh every 60 seconds
+    const interval = setInterval(() => {
+      fetch("/api/me")
+        .then((r) => r.json())
+        .then((d) => { if (d?.unread_messages !== undefined) setUnreadCount(d.unread_messages); })
+        .catch(() => {});
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   function navigate(href) {
     router.push(href);
@@ -63,10 +81,13 @@ export default function Sidebar({ user, onClose }) {
         {navItems.map((item) => {
           const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
           const Icon = item.icon;
+          const badge = item.href === "/messages" && unreadCount > 0 ? unreadCount : null;
           return (
             <button key={item.href} onClick={() => navigate(item.href)}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors ${active ? "bg-brand-700 text-white" : "text-gray-400 hover:bg-surface-2 hover:text-gray-200"}`}>
-              <Icon size={18} />{item.label}
+              <Icon size={18} />
+              <span className="flex-1 text-left">{item.label}</span>
+              {badge && <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{badge > 9 ? "9+" : badge}</span>}
             </button>
           );
         })}

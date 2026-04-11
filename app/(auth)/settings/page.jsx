@@ -227,6 +227,10 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3 mb-4"><Globe size={18} className="text-gray-400" /><span className="text-sm font-semibold">Club Settings</span></div>
           {settingsLoading ? <div className="text-gray-500 text-sm">Loading...</div> : (
             <form onSubmit={handleSaveSettings} className="space-y-1">
+              <FormField label="Required Monthly Contribution (UGX)">
+                <input type="number" step="1000" min="0" value={settings.required_contribution || ""} onChange={(e) => setSettings({ ...settings, required_contribution: e.target.value })} className={inputClass} />
+                <p className="text-[11px] text-gray-500 mt-1">Amount each member must contribute monthly. Members will be notified if behind. Current: {settings.required_contribution ? parseInt(settings.required_contribution).toLocaleString() : "Not set"}</p>
+              </FormField>
               <FormField label="USD to UGX Exchange Rate">
                 <input type="number" step="0.01" value={settings.ugx_rate || ""} onChange={(e) => setSettings({ ...settings, ugx_rate: e.target.value })} className={inputClass} />
                 <p className="text-[11px] text-gray-500 mt-1">Used when converting crypto prices from USD. Current: {settings.ugx_rate || "3691"}</p>
