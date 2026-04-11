@@ -10,6 +10,7 @@ export function middleware(request) {
     pathname === "/login" ||
     pathname === "/mfa-verify" ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/cron") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {
