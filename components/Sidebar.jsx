@@ -3,6 +3,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSign, Settings, X } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "./Toast";
+import { CLUB_SHORT } from "@/lib/constants";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -52,7 +53,7 @@ export default function Sidebar({ user, onClose }) {
       <div className="p-5 border-b border-surface-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-700 to-brand-500 flex items-center justify-center text-sm font-bold text-white">G6</div>
-          <div><div className="text-sm font-bold leading-tight">GM06</div><div className="text-[10px] tracking-[2px] text-gray-500">INVESTMENT CLUB</div></div>
+          <div><div className="text-sm font-bold leading-tight">{CLUB_SHORT}</div><div className="text-[10px] tracking-[2px] text-gray-500">INVESTMENT CLUB</div></div>
         </div>
         <button onClick={onClose} className="lg:hidden p-1 text-gray-500 hover:text-white"><X size={18} /></button>
       </div>

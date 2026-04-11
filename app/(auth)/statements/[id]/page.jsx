@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { fmtUGX } from "@/lib/format";
+import { CLUB_NAME } from "@/lib/constants";
 
 export default function StatementPage() {
   const { id } = useParams();
@@ -53,7 +54,7 @@ export default function StatementPage() {
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 30 }}>
           <div style={{ fontSize: 12, color: "#888" }}>{new Date(data.date).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })}</div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f766e", margin: "8px 0 2px" }}>GREEN MINDS 06</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f766e", margin: "8px 0 2px" }}>{CLUB_NAME}</h1>
           <div style={{ fontSize: 11, letterSpacing: 4, color: "#888" }}>INVESTMENT CLUB</div>
         </div>
 

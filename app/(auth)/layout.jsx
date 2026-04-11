@@ -4,7 +4,7 @@ import { verifyToken } from "@/lib/auth";
 import AuthShell from "@/components/AuthShell";
 
 export default async function AuthLayout({ children }) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get("gm06_session")?.value;
   if (!token) redirect("/login");
 

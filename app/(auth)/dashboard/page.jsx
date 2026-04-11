@@ -5,8 +5,9 @@ import { useToast } from "@/components/Toast";
 import { StatCard, DonutChart, Sparkline } from "@/components/Charts";
 import { fmtUGX, fmtShort, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
 import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Lock } from "lucide-react";
+import { CLUB_SHORT } from "@/lib/constants";
 
-function MemberDashboard() {
+function MemberDashboard({ hideHeader = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,14 +31,28 @@ function MemberDashboard() {
   }));
   const up = v.total_gain >= 0;
 
+  // Compute growth metrics from history snapshots
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const prevMonth = history.length >= 1 ? history[history.length - 1] : null;
+  const janSnapshot = history.find((h) => h.date?.startsWith(`${currentYear}-01`)) || (history.length > 0 ? history.find((h) => h.date?.startsWith(`${currentYear}-`)) : null);
+
+  const monthGain = prevMonth ? v.portfolio_value - prevMonth.portfolio_value : null;
+  const monthPct = prevMonth && prevMonth.portfolio_value > 0 ? ((monthGain / prevMonth.portfolio_value) * 100).toFixed(1) : null;
+
+  const ytdGain = janSnapshot ? v.portfolio_value - janSnapshot.portfolio_value : null;
+  const ytdPct = janSnapshot && janSnapshot.portfolio_value > 0 ? ((ytdGain / janSnapshot.portfolio_value) * 100).toFixed(1) : null;
+
   return (
     <div className="animate-in">
-      <div className="mb-7">
-        <h1 className="text-2xl font-bold">Welcome, {member.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</h1>
-        <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" /> Live portfolio valuation
-        </p>
-      </div>
+      {!hideHeader && (
+        <div className="mb-7">
+          <h1 className="text-2xl font-bold">Welcome, {member.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</h1>
+          <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" /> Live portfolio valuation
+          </p>
+        </div>
+      )}
 
       {/* Hero */}
       <div className="card mb-6" style={{ borderColor: "rgba(15,118,110,0.3)" }}>
@@ -52,22 +67,47 @@ function MemberDashboard() {
           </span>
           <span className="text-gray-500">since inception</span>
         </div>
+        <div className="text-xs text-gray-500 mt-2">Monthly contribution: <span className="font-mono text-white">{fmtUGX(member.monthly_contribution)}</span></div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total Invested" value={fmtUGX(v.total_invested)} />
-        <StatCard label="Total Gain" value={fmtUGX(v.total_gain)} sub={`${v.return_pct}% return`} color={up ? "#22C55E" : "#EF4444"} />
-        <StatCard label="Monthly Contribution" value={fmtUGX(member.monthly_contribution)} />
+        <StatCard
+          label="This Month"
+          value={monthGain !== null ? `${monthGain >= 0 ? "+" : ""}${fmtShort(monthGain)}` : "—"}
+          sub={monthPct !== null ? `${monthPct >= 0 ? "+" : ""}${monthPct}%` : "No prior month"}
+          color={monthGain === null ? "#6B7280" : monthGain >= 0 ? "#22C55E" : "#EF4444"}
+        />
+        <StatCard
+          label="This Year"
+          value={ytdGain !== null ? `${ytdGain >= 0 ? "+" : ""}${fmtShort(ytdGain)}` : "—"}
+          sub={ytdPct !== null ? `${ytdPct >= 0 ? "+" : ""}${ytdPct}% YTD` : "No prior year data"}
+          color={ytdGain === null ? "#6B7280" : ytdGain >= 0 ? "#22C55E" : "#EF4444"}
+        />
         <StatCard label="Status" value={v.advance_contribution >= 0 ? "Current" : "Behind"} sub={`${v.advance_contribution >= 0 ? "+" : ""}${fmtShort(v.advance_contribution)}`} color={v.advance_contribution >= 0 ? "#22C55E" : "#EF4444"} />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
         <div className="lg:col-span-3 card">
-          <div className="text-sm font-semibold mb-4">Portfolio Over Time</div>
+          <div className="flex justify-between items-center mb-4">
+            <div className="text-sm font-semibold">Portfolio Over Time</div>
+            {history.length > 0 && (
+              <div className="text-[11px] text-gray-500">
+                {new Date(history[0].date).toLocaleDateString("en-GB", { month: "short", year: "numeric" })} — Present
+              </div>
+            )}
+          </div>
           {history.length > 1 ? (
-            <Sparkline data={history.map((h) => h.portfolio_value)} width={500} height={120} color="#14B8A6" />
+            <>
+              <Sparkline data={history.map((h) => h.portfolio_value)} width={500} height={120} color="#14B8A6" />
+              <div className="flex justify-between text-[10px] text-gray-600 mt-2 px-1">
+                {history.filter((_, i) => i === 0 || i === history.length - 1 || i === Math.floor(history.length / 2)).map((h) => (
+                  <span key={h.date}>{new Date(h.date).toLocaleDateString("en-GB", { month: "short", year: "2-digit" })}</span>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="text-gray-500 text-sm py-8 text-center">Chart appears after the second monthly valuation</div>
           )}
@@ -173,7 +213,7 @@ function AdminDashboard() {
 
   return (
     <div className="animate-in">
-      <div className="mb-7"><h1 className="text-2xl font-bold">Club Dashboard</h1><p className="text-sm text-gray-500 mt-1">GM06 Investment Club overview</p></div>
+      <div className="mb-7"><h1 className="text-2xl font-bold">Club Dashboard</h1><p className="text-sm text-gray-500 mt-1">{CLUB_SHORT} Investment Club overview</p></div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Portfolio Value" value={fmtUGX(totalValue)} sub={`+${returnPct}% return`} color="#22C55E" />
@@ -209,7 +249,7 @@ function AdminDashboard() {
                 <div><div className="font-medium">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div><div className="text-[11px] text-gray-500">{m.monthly_contribution > 0 ? `${fmtShort(m.monthly_contribution)}/mo` : "No monthly"}</div></div>
                 <div className="text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
                 <div className="text-right font-mono font-semibold">{fmtShort(s?.portfolio_value || 0)}</div>
-                <div className="text-right text-green-400 font-semibold">+{ret}%</div>
+                <div className={`text-right font-semibold ${ret >= 0 ? "text-green-400" : "text-red-400"}`}>{ret >= 0 ? "+" : ""}{ret}%</div>
                 <div className="text-right"><span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.advance_contribution || 0) >= 0 ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{(s?.advance_contribution || 0) >= 0 ? "Current" : `−${fmtShort(Math.abs(s.advance_contribution))}`}</span></div>
               </div>
             );
@@ -223,5 +263,21 @@ function AdminDashboard() {
 export default function DashboardPage() {
   const user = useUser();
   if (!user) return null;
-  return user.role === "admin" ? <AdminDashboard /> : <MemberDashboard />;
+
+  if (user.role === "admin") {
+    return (
+      <>
+        <AdminDashboard />
+        <div className="mt-8 pt-8 border-t border-surface-3">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-400">My Portfolio</h2>
+            <p className="text-xs text-gray-500">Your personal investment overview</p>
+          </div>
+          <MemberDashboard hideHeader />
+        </div>
+      </>
+    );
+  }
+
+  return <MemberDashboard />;
 }

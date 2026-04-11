@@ -4,6 +4,7 @@ import { useUser } from "@/components/AuthShell";
 import { useRouter } from "next/navigation";
 import { Search, Download, X } from "lucide-react";
 import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
+import { CLUB_NAME } from "@/lib/constants";
 import { DonutChart } from "@/components/Charts";
 
 function StatementModal({ member, onClose }) {
@@ -12,7 +13,7 @@ function StatementModal({ member, onClose }) {
 
   useEffect(() => {
     if (!member) return;
-    fetch(`/api/statements?member_id=${member.id}&date=2026-03-01`)
+    fetch(`/api/statements?member_id=${member.id}`)
       .then((r) => r.json())
       .then((d) => { setData(d); setLoading(false); });
   }, [member]);
@@ -30,7 +31,7 @@ function StatementModal({ member, onClose }) {
           <>
             <div className="text-center mb-6">
               <div className="text-[11px] text-gray-400 tracking-wide">{fmtDate(data.date)}</div>
-              <h2 className="text-lg font-bold text-teal-700 mt-1">GREEN MINDS 06</h2>
+              <h2 className="text-lg font-bold text-teal-700 mt-1">{CLUB_NAME}</h2>
               <div className="text-[10px] tracking-[3px] text-gray-400">INVESTMENT CLUB</div>
             </div>
 
@@ -150,7 +151,7 @@ export default function MembersPage() {
               </div>
               <div className="text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
               <div className="text-right font-mono font-semibold">{fmtShort(s?.portfolio_value || 0)}</div>
-              <div className="text-right text-green-400 font-semibold">+{ret}%</div>
+              <div className={`text-right font-semibold ${ret >= 0 ? "text-green-400" : "text-red-400"}`}>{ret >= 0 ? "+" : ""}{ret}%</div>
               <div className="text-right">
                 <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.advance_contribution || 0) >= 0 ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>
                   {(s?.advance_contribution || 0) >= 0 ? "Current" : `−${fmtShort(Math.abs(s.advance_contribution))}`}

@@ -3,10 +3,10 @@ export const maxDuration = 30;
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 
-// GET /api/snapshots — list portfolio snapshots
+// GET /api/snapshots — list portfolio snapshots (admin only)
 export async function GET() {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !isAdmin(session)) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
 
   const db = getServiceClient();
   const { data } = await db.from("portfolio_snapshots").select("*").order("date", { ascending: false }).limit(50);
@@ -42,36 +42,26 @@ export async function POST(request) {
   const { data: members } = await db.from("members").select("id, name, monthly_contribution").eq("is_active", true);
   if (!members?.length) return NextResponse.json({ error: "No active members" }, { status: 400 });
 
-  // 3. Calculate each member's total contributions (deposits - withdrawals)
+  // 3. Fetch ALL contributions up to the date in a single query (avoids N+1)
+  const { data: allContribs } = await db
+    .from("contributions")
+    .select("member_id, amount, type")
+    .lte("date", date);
+
+  // Group contributions by member in memory
   const memberContributions = {};
   for (const m of members) {
-    const { data: contribs } = await db
-      .from("contributions")
-      .select("amount, type")
-      .eq("member_id", m.id)
-      .lte("date", date);
-
-    let totalDeposits = 0;
-    let totalFines = 0;
-    let totalExpenses = 0;
-    let totalWithdrawals = 0;
-
-    (contribs || []).forEach((c) => {
-      switch (c.type) {
-        case "deposit": totalDeposits += c.amount; break;
-        case "fine": totalFines += c.amount; break;
-        case "expense": totalExpenses += c.amount; break;
-        case "withdrawal": totalWithdrawals += c.amount; break;
-      }
-    });
-
-    // Net contribution = deposits (what the member put in)
-    memberContributions[m.id] = {
-      totalInvested: totalDeposits,
-      netContribution: totalDeposits - totalWithdrawals,
-      fines: totalFines,
-      expenses: totalExpenses,
-    };
+    memberContributions[m.id] = { totalInvested: 0, netContribution: 0, fines: 0, expenses: 0 };
+  }
+  for (const c of (allContribs || [])) {
+    const mc = memberContributions[c.member_id];
+    if (!mc) continue;
+    switch (c.type) {
+      case "deposit": mc.totalInvested += c.amount; mc.netContribution += c.amount; break;
+      case "fine": mc.fines += c.amount; break;
+      case "expense": mc.expenses += c.amount; break;
+      case "withdrawal": mc.netContribution -= c.amount; break;
+    }
   }
 
   // 4. Calculate total club contributions (sum of all members' net contributions)
@@ -82,12 +72,9 @@ export async function POST(request) {
   for (const m of members) {
     const mc = memberContributions[m.id] || { totalInvested: 0, netContribution: 0 };
 
-    // Member's share = their net contribution / total club contributions
     const share = totalClubContributions > 0 ? mc.netContribution / totalClubContributions : 1 / members.length;
     const portfolioValue = totalPortfolioValue * share;
 
-    // Advance = total contributed - expected contribution (based on schedule)
-    // For simplicity: advance = net contribution - average contribution across members
     const avgContribution = totalClubContributions / members.length;
     const advance = mc.netContribution - avgContribution;
 
@@ -100,20 +87,9 @@ export async function POST(request) {
     });
   }
 
-  // 6. Upsert member snapshots (update if date already exists)
+  // 6. Upsert member snapshots (unique constraint on member_id + date)
   for (const snap of memberSnapshots) {
-    const { data: existing } = await db
-      .from("member_snapshots")
-      .select("id")
-      .eq("member_id", snap.member_id)
-      .eq("date", snap.date)
-      .single();
-
-    if (existing) {
-      await db.from("member_snapshots").update(snap).eq("id", existing.id);
-    } else {
-      await db.from("member_snapshots").insert(snap);
-    }
+    await db.from("member_snapshots").upsert(snap, { onConflict: "member_id,date" });
   }
 
   // 7. Upsert portfolio snapshot
@@ -130,12 +106,7 @@ export async function POST(request) {
     cash_value: assetTotals.cash || 0,
   };
 
-  const { data: existingSnap } = await db.from("portfolio_snapshots").select("id").eq("date", date).single();
-  if (existingSnap) {
-    await db.from("portfolio_snapshots").update(portfolioSnap).eq("id", existingSnap.id);
-  } else {
-    await db.from("portfolio_snapshots").insert(portfolioSnap);
-  }
+  await db.from("portfolio_snapshots").upsert(portfolioSnap, { onConflict: "date" });
 
   return NextResponse.json({
     ok: true,

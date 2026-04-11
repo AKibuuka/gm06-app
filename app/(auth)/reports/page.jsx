@@ -4,6 +4,7 @@ import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { FileText, Users, AlertTriangle, Download, Eye, Printer, FileSpreadsheet } from "lucide-react";
 import { fmtUGX, fmtShort, ASSET_CLASS_LABELS } from "@/lib/format";
+import { CLUB_NAME } from "@/lib/constants";
 
 export default function ReportsPage() {
   const user = useUser();
@@ -39,7 +40,18 @@ export default function ReportsPage() {
   if (loading) return <div className="text-gray-500 text-sm p-8">Loading...</div>;
 
   // ── Member View ──
-  if (user?.role !== "admin" && myData?.valuation) {
+  if (user?.role !== "admin") {
+    if (!myData?.valuation) {
+      return (
+        <div className="animate-in">
+          <div className="mb-7">
+            <h1 className="text-2xl font-bold">Your Statement</h1>
+            <p className="text-sm text-gray-500 mt-1">Current portfolio statement</p>
+          </div>
+          <div className="card text-gray-400 text-sm">No portfolio data available yet. The treasurer needs to run a monthly valuation first.</div>
+        </div>
+      );
+    }
     const v = myData.valuation;
     const segments = (v.allocation || []).filter((a) => a.pct > 0);
 
@@ -54,7 +66,7 @@ export default function ReportsPage() {
           {/* Statement preview */}
           <div className="bg-white text-gray-900 rounded-2xl p-8 mb-4">
             <div className="text-center mb-6">
-              <h2 className="text-lg font-bold text-teal-700">GREEN MINDS 06</h2>
+              <h2 className="text-lg font-bold text-teal-700">{CLUB_NAME}</h2>
               <div className="text-[10px] tracking-[3px] text-gray-400">INVESTMENT CLUB</div>
             </div>
             <div className="bg-teal-50 rounded-xl p-5 mb-5">

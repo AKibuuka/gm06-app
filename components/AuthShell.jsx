@@ -3,6 +3,7 @@ import { createContext, useContext, useState } from "react";
 import Sidebar from "./Sidebar";
 import { ToastProvider } from "./Toast";
 import { Menu, X } from "lucide-react";
+import { CLUB_SHORT } from "@/lib/constants";
 
 const UserContext = createContext(null);
 export const useUser = () => useContext(UserContext);
@@ -34,7 +35,7 @@ export default function AuthShell({ user, children }) {
               <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-lg hover:bg-surface-2 text-gray-400">
                 <Menu size={20} />
               </button>
-              <div className="text-sm font-bold">GM06 Investment Club</div>
+              <div className="text-sm font-bold">{CLUB_SHORT} Investment Club</div>
             </div>
             <div className="p-4 lg:p-7 overflow-auto">
               {children}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const maxDuration = 15;
 import bcrypt from "bcryptjs";
 import { getSession, isAdmin, hashPassword } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
@@ -7,7 +8,7 @@ import { getServiceClient } from "@/lib/supabase";
 // Body: { current_password, new_password } for self
 // Body: { member_id, new_password } for admin resetting another member
 export async function PUT(request) {
-  const session = getSession();
+  const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { current_password, new_password, member_id } = await request.json();

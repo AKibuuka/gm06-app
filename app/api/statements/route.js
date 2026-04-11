@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
+import { ASSET_CLASS_LABELS } from "@/lib/format";
+import { CLUB_FULL_NAME } from "@/lib/constants";
+export const maxDuration = 15;
 
 // GET /api/statements?member_id=xxx&date=2026-03-01
 // Returns full statement data for a member at a given date
@@ -10,7 +13,20 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const memberId = searchParams.get("member_id");
-  const date = searchParams.get("date") || "2026-03-01";
+  let date = searchParams.get("date");
+
+  // If no date provided, use the latest snapshot date
+  if (!date) {
+    const db0 = getServiceClient();
+    const { data: latestSnap } = await db0
+      .from("member_snapshots")
+      .select("date")
+      .eq("member_id", memberId)
+      .order("date", { ascending: false })
+      .limit(1)
+      .single();
+    date = latestSnap?.date || new Date().toISOString().split("T")[0];
+  }
 
   // Members can only get their own statement
   if (!isAdmin(session) && memberId !== session.id) {
@@ -20,7 +36,7 @@ export async function GET(request) {
   const db = getServiceClient();
 
   // Get member
-  const { data: member } = await db.from("members").select("*").eq("id", memberId).single();
+  const { data: member } = await db.from("members").select("id, name, email, phone, monthly_contribution").eq("id", memberId).single();
   if (!member) return NextResponse.json({ error: "Member not found" }, { status: 404 });
 
   // Get member snapshot for the date
@@ -49,15 +65,11 @@ export async function GET(request) {
   let allocation = [];
   if (portfolioSnap && snapshot) {
     const totalPV = portfolioSnap.total_value || 1;
-    const classes = [
-      { name: "Fixed Income Securities (UAP)", value: portfolioSnap.fixed_income_value },
-      { name: "Stocks", value: portfolioSnap.stocks_value },
-      { name: "Digital Assets", value: portfolioSnap.digital_assets_value },
-      { name: "Real Estate", value: portfolioSnap.real_estate_value },
-      { name: "Private Equity", value: portfolioSnap.private_equity_value },
-      { name: "Loans", value: portfolioSnap.loans_value },
-      { name: "Cash", value: portfolioSnap.cash_value },
-    ];
+    const classKeys = ["fixed_income", "stocks", "digital_assets", "real_estate", "private_equity", "loans", "cash"];
+    const classes = classKeys.map((key) => ({
+      name: ASSET_CLASS_LABELS[key] || key,
+      value: portfolioSnap[`${key}_value`] || 0,
+    }));
 
     allocation = classes.map((c) => {
       const pct = (c.value / totalPV) * 100;
@@ -73,6 +85,6 @@ export async function GET(request) {
     contributions: contributions || [],
     fines: fines || [],
     date,
-    club: { name: "GREEN MINDS 06 INVESTMENT CLUB" },
+    club: { name: CLUB_FULL_NAME },
   });
 }

@@ -4,7 +4,7 @@ import { getServiceClient } from "@/lib/supabase";
 
 export async function GET() {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !isAdmin(session)) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
 
   const db = getServiceClient();
   const { data } = await db.from("investments").select("*").order("asset_class").order("name");

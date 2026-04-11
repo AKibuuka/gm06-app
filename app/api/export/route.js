@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+export const maxDuration = 15;
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 
 // GET /api/export?type=members|contributions|portfolio|arrears
 export async function GET(request) {
-  const session = getSession();
+  const session = await getSession();
   if (!session || !isAdmin(session)) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);

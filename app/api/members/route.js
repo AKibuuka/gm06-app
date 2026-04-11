@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+export const maxDuration = 15;
 import { getSession, isAdmin, hashPassword, generateDefaultPassword } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 
 export async function GET() {
-  const session = getSession();
+  const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = getServiceClient();
@@ -48,7 +49,7 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const session = getSession();
+  const session = await getSession();
   if (!session || !isAdmin(session)) {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }
@@ -84,7 +85,7 @@ export async function POST(request) {
 }
 
 export async function PUT(request) {
-  const session = getSession();
+  const session = await getSession();
   if (!session || !isAdmin(session)) {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }
@@ -109,7 +110,7 @@ export async function PUT(request) {
 }
 
 export async function DELETE(request) {
-  const session = getSession();
+  const session = await getSession();
   if (!session || !isAdmin(session)) {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }

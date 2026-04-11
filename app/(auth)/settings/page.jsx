@@ -21,8 +21,12 @@ export default function SettingsPage() {
   const [settingsSubmitting, setSettingsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch("/api/settings").then((r) => r.json()).then((d) => { setSettings(d); setSettingsLoading(false); }).catch(() => setSettingsLoading(false));
-  }, []);
+    if (user?.role === "admin") {
+      fetch("/api/settings").then((r) => r.json()).then((d) => { setSettings(d); setSettingsLoading(false); }).catch(() => setSettingsLoading(false));
+    } else {
+      setSettingsLoading(false);
+    }
+  }, [user]);
 
   async function handleChangePassword(e) {
     e.preventDefault();

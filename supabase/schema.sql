@@ -70,7 +70,8 @@ create table portfolio_snapshots (
   private_equity_value numeric(15,2) default 0,
   loans_value numeric(15,2) default 0,
   cash_value numeric(15,2) default 0,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  unique(date)
 );
 
 -- 6. Member snapshots (monthly per-member valuation)
