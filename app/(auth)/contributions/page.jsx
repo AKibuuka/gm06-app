@@ -58,11 +58,12 @@ export default function ContributionsPage() {
     const res = await fetch("/api/contributions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
     if (res.ok) {
       const data = await res.json();
+      const recordedAmount = parseFloat(form.amount); // capture before reset
       setContributions([data, ...contributions]);
       setShowAdd(false);
       setForm({ member_id: "", amount: "", type: "deposit", description: "", bank_ref: "", date: new Date().toISOString().split("T")[0] });
       const msg = data.loan_deduction
-        ? `Recorded ${fmtUGX(parseFloat(form.amount))} — ${fmtUGX(data.loan_deduction.amount_applied)} applied to loan, ${fmtUGX(data.loan_deduction.excess)} to portfolio`
+        ? `Recorded ${fmtUGX(recordedAmount)} — ${fmtUGX(data.loan_deduction.amount_applied)} applied to loan, ${fmtUGX(data.loan_deduction.excess)} to portfolio`
         : `Contribution of ${fmtUGX(data.amount)} recorded`;
       toast?.(msg, "success");
     } else { const err = await res.json(); toast?.(err.error, "error"); }

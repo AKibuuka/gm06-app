@@ -142,8 +142,8 @@ export default function LoansPage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
             <div><div className="text-xs text-gray-500">Loan Amount</div><div className="text-lg font-bold font-mono">{fmtUGX(activeLoan.amount)}</div></div>
-            <div><div className="text-xs text-gray-500">Interest ({activeLoan.interest_rate}%)</div><div className="text-lg font-bold font-mono">{fmtUGX((activeLoan.calculated_total_due || activeLoan.total_due) - activeLoan.amount)}</div></div>
-            <div><div className="text-xs text-gray-500">Total Due</div><div className="text-lg font-bold font-mono">{fmtUGX(activeLoan.calculated_total_due || activeLoan.total_due)}</div></div>
+            <div><div className="text-xs text-gray-500">Interest ({activeLoan.interest_rate}%)</div><div className="text-lg font-bold font-mono">{fmtUGX((activeLoan.calculated_total_due || activeLoan.total_due || 0) - (activeLoan.amount || 0))}</div></div>
+            <div><div className="text-xs text-gray-500">Total Due</div><div className="text-lg font-bold font-mono">{fmtUGX(activeLoan.calculated_total_due || activeLoan.total_due || 0)}</div></div>
             <div><div className="text-xs text-gray-500">Remaining</div><div className={`text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : "text-amber-400"}`}>{fmtUGX(activeLoan.remaining || 0)}</div></div>
             {activeLoan.due_date && <div><div className="text-xs text-gray-500">Due Date</div><div className={`text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : ""}`}>{fmtDate(activeLoan.due_date)}</div></div>}
           </div>

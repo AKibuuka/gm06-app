@@ -17,7 +17,8 @@ function StatementModal({ member, onClose }) {
     if (!member) return;
     fetch(`/api/statements?member_id=${member.id}`)
       .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); });
+      .then((d) => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
   }, [member]);
 
   if (!member) return null;

@@ -95,7 +95,7 @@ export async function POST(request) {
       const excess = overdue ? 0 : Math.max(0, Math.round((depositAmount - loanPayment) * 100) / 100);
 
       // Record loan payment
-      await db.from("loan_payments").insert({
+      const { error: paymentError } = await db.from("loan_payments").insert({
         loan_id: activeLoan.id,
         member_id,
         amount: Math.min(loanPayment, remaining),
@@ -103,6 +103,7 @@ export async function POST(request) {
         contribution_id: data.id,
         note: overdue ? `Overdue loan recovery from deposit of ${depositAmount}` : `Auto-deducted from deposit of ${depositAmount}`,
       });
+      if (paymentError) return NextResponse.json({ error: "Failed to record loan payment" }, { status: 500 });
 
       // Update loan
       const newAmountPaid = Math.round((activeLoan.amount_paid + loanPayment) * 100) / 100;

@@ -33,6 +33,14 @@ export async function PUT(request) {
     return NextResponse.json({ error: `Invalid setting keys: ${rejected.join(", ")}` }, { status: 400 });
   }
 
+  // Validate numeric settings
+  const NUMERIC_KEYS = ["ugx_rate", "monthly_target", "required_contribution", "max_loan_pct", "loan_interest_rate"];
+  for (const key of NUMERIC_KEYS) {
+    if (updates[key] !== undefined && (isNaN(parseFloat(updates[key])) || parseFloat(updates[key]) < 0)) {
+      return NextResponse.json({ error: `${key} must be a valid positive number` }, { status: 400 });
+    }
+  }
+
   for (const [key, value] of Object.entries(updates)) {
     await db.from("settings").upsert({ key, value: String(value), updated_at: new Date().toISOString() }, { onConflict: "key" });
   }

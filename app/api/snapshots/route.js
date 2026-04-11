@@ -59,7 +59,7 @@ export async function POST(request) {
     switch (c.type) {
       case "deposit": mc.totalInvested += c.amount; mc.netContribution += c.amount; break;
       case "fine": mc.fines += c.amount; break;
-      case "expense": mc.expenses += c.amount; break;
+      case "expense": mc.expenses += c.amount; mc.netContribution -= c.amount; break;
       case "withdrawal": mc.netContribution -= c.amount; break;
     }
   }
@@ -88,8 +88,13 @@ export async function POST(request) {
   }
 
   // 6. Upsert member snapshots (unique constraint on member_id + date)
+  const failedMembers = [];
   for (const snap of memberSnapshots) {
-    await db.from("member_snapshots").upsert(snap, { onConflict: "member_id,date" });
+    const { error } = await db.from("member_snapshots").upsert(snap, { onConflict: "member_id,date" });
+    if (error) failedMembers.push(snap.member_id);
+  }
+  if (failedMembers.length > 0) {
+    return NextResponse.json({ error: `Failed to save ${failedMembers.length} member snapshot(s)` }, { status: 500 });
   }
 
   // 7. Upsert portfolio snapshot
@@ -106,7 +111,8 @@ export async function POST(request) {
     cash_value: assetTotals.cash || 0,
   };
 
-  await db.from("portfolio_snapshots").upsert(portfolioSnap, { onConflict: "date" });
+  const { error: snapError } = await db.from("portfolio_snapshots").upsert(portfolioSnap, { onConflict: "date" });
+  if (snapError) return NextResponse.json({ error: "Failed to save portfolio snapshot" }, { status: 500 });
 
   return NextResponse.json({
     ok: true,
