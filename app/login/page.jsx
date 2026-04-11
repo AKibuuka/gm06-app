@@ -27,6 +27,12 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Login failed"); setLoading(false); return; }
+      // MFA required — redirect to verification page
+      if (data.mfa_required) {
+        const params = new URLSearchParams({ t: data.temp_token, name: data.member?.name || "" });
+        router.replace(`/mfa-verify?${params.toString()}`);
+        return;
+      }
       router.replace("/dashboard");
     } catch {
       setError("Unable to connect. Check your internet connection.");

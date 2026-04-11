@@ -14,12 +14,22 @@ export async function POST(request) {
     return NextResponse.json({ error: result.error }, { status: 401 });
   }
 
+  // MFA required — return temp token, don't set session cookie yet
+  if (result.mfa_required) {
+    return NextResponse.json({
+      mfa_required: true,
+      temp_token: result.temp_token,
+      member: result.member,
+    });
+  }
+
+  // No MFA — set session cookie directly
   const response = NextResponse.json({ member: result.member });
   response.cookies.set("gm06_session", result.token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: 60 * 60 * 24 * 7,
     path: "/",
   });
 

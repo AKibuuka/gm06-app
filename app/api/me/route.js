@@ -14,7 +14,7 @@ export async function GET() {
   // Member profile
   const { data: member } = await db
     .from("members")
-    .select("id, name, email, phone, role, monthly_contribution, joined_at")
+    .select("id, name, email, phone, role, monthly_contribution, joined_at, mfa_enabled")
     .eq("id", session.id)
     .single();
 
