@@ -10,6 +10,6 @@ export async function POST() {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }
 
-  const updated = await updatePrices();
-  return NextResponse.json({ updated, timestamp: new Date().toISOString() });
+  const result = await updatePrices();
+  return NextResponse.json({ updated: result.updated, errors: result.errors, timestamp: new Date().toISOString() });
 }

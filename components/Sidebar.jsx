@@ -72,7 +72,9 @@ export default function Sidebar({ user, onClose }) {
       const res = await fetch("/api/prices", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        toast?.(`Updated ${data.updated} prices`, "success");
+        const msg = `Updated ${data.updated} prices`;
+        const errMsg = data.errors?.length ? ` (failed: ${data.errors.join(", ")})` : "";
+        toast?.(msg + errMsg, data.errors?.length ? "error" : "success");
       } else { toast?.("Price update failed", "error"); }
     } catch { toast?.("Network error", "error"); }
     setUpdating(false);
