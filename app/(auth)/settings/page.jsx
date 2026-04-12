@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
-import { Lock, User, Globe, Save, Shield, Copy, Eye, EyeOff } from "lucide-react";
+import { Lock, User, Globe, Save, Shield, Copy, Eye, EyeOff, Sun, Moon } from "lucide-react";
 import { FormField, inputClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import useTitle from "@/lib/useTitle";
 
@@ -25,6 +25,22 @@ export default function SettingsPage() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [disablePwd, setDisablePwd] = useState("");
   const [showDisable, setShowDisable] = useState(false);
+
+  // Theme
+  const [theme, setTheme] = useState("dark");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("gm06_theme") || "dark";
+    setTheme(saved);
+    document.documentElement.setAttribute("data-theme", saved);
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("gm06_theme", next);
+    document.documentElement.setAttribute("data-theme", next);
+  }
 
   // Club settings (admin)
   const [settings, setSettings] = useState({});
@@ -133,6 +149,19 @@ export default function SettingsPage() {
           <div className="flex justify-between"><span className="text-gray-500">Name</span><span>{user.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</span></div>
           <div className="flex justify-between"><span className="text-gray-500">Email</span><span className="font-mono text-xs">{user.email}</span></div>
           <div className="flex justify-between"><span className="text-gray-500">Role</span><span className="capitalize">{user.role}</span></div>
+        </div>
+      </div>
+
+      {/* Theme */}
+      <div className="card mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {theme === "dark" ? <Moon size={18} className="text-gray-400" /> : <Sun size={18} className="text-amber-400" />}
+            <div><div className="text-sm font-semibold">Appearance</div><div className="text-xs text-gray-500">{theme === "dark" ? "Dark" : "Light"} mode</div></div>
+          </div>
+          <button onClick={toggleTheme} className={`relative w-12 h-6 rounded-full transition-colors ${theme === "dark" ? "bg-surface-3" : "bg-brand-700"}`}>
+            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${theme === "dark" ? "left-0.5" : "left-[26px]"}`} />
+          </button>
         </div>
       </div>
 

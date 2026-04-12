@@ -4,16 +4,36 @@
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
+:root {
+  --surface-0: #0C1117;
+  --surface-1: #151B23;
+  --surface-2: #1C2430;
+  --surface-3: #252D3A;
+}
+
+[data-theme="light"] {
+  --surface-0: #F8FAFC;
+  --surface-1: #FFFFFF;
+  --surface-2: #F1F5F9;
+  --surface-3: #E2E8F0;
+}
+
 body {
-  background: #0C1117;
+  background: var(--surface-0);
   color: #E2E8F0;
   font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+[data-theme="light"] body {
+  color: #1E293B;
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #0C1117; }
 ::-webkit-scrollbar-thumb { background: #252D3A; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a4558; }
+[data-theme="light"] ::-webkit-scrollbar-track { background: #F1F5F9; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #CBD5E1; }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -24,8 +44,8 @@ body {
   .animate-in { animation: fadeIn 0.3s ease both; }
 
   .card {
-    background: #151B23;
-    border: 1px solid #252D3A;
+    background: var(--surface-1);
+    border: 1px solid var(--surface-3);
     border-radius: 0.75rem;
     padding: 1.25rem;
     transition: border-color 0.2s;
@@ -33,4 +53,22 @@ body {
   .card:hover {
     border-color: rgba(15, 118, 110, 0.25);
   }
+}
+
+/* Light theme text & element overrides */
+[data-theme="light"] .text-white { color: #1E293B; }
+[data-theme="light"] .text-gray-200 { color: #334155; }
+[data-theme="light"] .text-gray-300 { color: #475569; }
+[data-theme="light"] .text-gray-400 { color: #64748B; }
+[data-theme="light"] .text-gray-500 { color: #94A3B8; }
+[data-theme="light"] .text-gray-600 { color: #94A3B8; }
+[data-theme="light"] .bg-surface-0 { background: var(--surface-0); }
+[data-theme="light"] .bg-surface-1 { background: var(--surface-1); }
+[data-theme="light"] .bg-surface-2 { background: var(--surface-2); }
+[data-theme="light"] .bg-surface-3 { background: var(--surface-3); }
+[data-theme="light"] .border-surface-3 { border-color: var(--surface-3); }
+[data-theme="light"] input, [data-theme="light"] select, [data-theme="light"] textarea {
+  background: var(--surface-2) !important;
+  border-color: var(--surface-3) !important;
+  color: #1E293B !important;
 }

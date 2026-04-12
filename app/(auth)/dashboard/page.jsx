@@ -14,15 +14,19 @@ import AdminNotifications from "@/components/AdminNotifications";
 function MemberDashboard({ hideHeader = false }) {
   useTitle("Dashboard");
   const [data, setData] = useState(null);
+  const [clubActivity, setClubActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("personal");
 
   useEffect(() => {
-    fetch("/api/me")
-      .then((r) => { if (!r.ok) throw new Error("Failed to load"); return r.json(); })
-      .then(setData)
-      .catch((e) => setError(e.message))
+    Promise.all([
+      fetch("/api/me").then((r) => { if (!r.ok) throw new Error("Failed to load"); return r.json(); }),
+      fetch("/api/activity").then((r) => r.json()).catch(() => []),
+    ]).then(([me, act]) => {
+      setData(me);
+      setClubActivity(Array.isArray(act) ? act : []);
+    }).catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
@@ -202,6 +206,23 @@ function MemberDashboard({ hideHeader = false }) {
             </div>
           </div>
 
+          {/* Recent contribution receipt */}
+          {contributions?.length > 0 && (() => {
+            const latest = contributions[0];
+            const daysAgo = Math.floor((Date.now() - new Date(latest.date).getTime()) / (86400000));
+            if (daysAgo > 7) return null;
+            return (
+              <div className="card mb-4 flex items-center gap-3" style={{ borderColor: "rgba(34,197,94,0.3)", background: "rgba(22,101,52,0.08)" }}>
+                <div className="w-9 h-9 rounded-lg bg-green-900/30 flex items-center justify-center shrink-0"><ArrowDown size={18} className="text-green-400" /></div>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold text-green-400">Contribution Recorded</div>
+                  <div className="text-xs text-gray-400">{fmtUGX(latest.amount)} {latest.type} on {fmtDate(latest.date)}{latest.description ? ` — ${latest.description}` : ""}</div>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-green-900/20 text-green-400 text-[10px] font-semibold shrink-0">{daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo}d ago`}</span>
+              </div>
+            );
+          })()}
+
           {/* Holdings + Activity */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="space-y-4">
@@ -309,6 +330,26 @@ function MemberDashboard({ hideHeader = false }) {
         </div>
       )}
 
+      {/* Club Activity Feed */}
+      {tab === "personal" && clubActivity.length > 0 && (
+        <div className="card mt-5">
+          <div className="text-sm font-semibold mb-3">Club Activity</div>
+          <div className="divide-y divide-surface-3">
+            {clubActivity.slice(0, 8).map((item, i) => (
+              <div key={i} className="flex items-center gap-3 py-2.5">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${item.icon === "dollar" ? "bg-green-900/30" : item.icon === "landmark" ? "bg-blue-900/30" : "bg-amber-900/30"}`}>
+                  {item.icon === "dollar" && <DollarSign size={14} className="text-green-400" />}
+                  {item.icon === "landmark" && <Landmark size={14} className="text-blue-400" />}
+                  {item.icon === "alert" && <AlertTriangle size={14} className="text-amber-400" />}
+                </div>
+                <div className="flex-1 min-w-0 text-xs text-gray-400 truncate">{titleCase(item.text)}</div>
+                <div className="text-[10px] text-gray-600 shrink-0">{fmtDate(item.date)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ═══ CLUB OVERVIEW TAB ═══ */}
       {tab === "club" && (
         <div>
@@ -384,15 +425,21 @@ function AdminDashboard() {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [contributions, setContributions] = useState([]);
+
   useEffect(() => {
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     Promise.all([
       fetch("/api/members").then((r) => r.json()),
       fetch("/api/portfolio").then((r) => r.json()),
       fetch("/api/activity").then((r) => r.json()),
-    ]).then(([m, p, a]) => {
+      fetch(`/api/contributions?type=deposit&from=${monthStart}`).then((r) => r.json()),
+    ]).then(([m, p, a, c]) => {
       setMembers(Array.isArray(m) ? m : []);
       setPortfolio(p);
       setActivity(Array.isArray(a) ? a : []);
+      setContributions(Array.isArray(c) ? c : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -434,6 +481,28 @@ function AdminDashboard() {
           <a href="/contributions" className="bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap">Record Now</a>
         </div>
       )}
+
+      {/* Members who haven't contributed this month */}
+      {(() => {
+        const paidMemberIds = new Set(contributions.map((c) => c.member_id));
+        const unpaid = members.filter((m) => !paidMemberIds.has(m.id));
+        if (unpaid.length === 0) return null;
+        return (
+          <div className="card mb-5 p-0 overflow-hidden" style={{ borderColor: "rgba(239,68,68,0.2)" }}>
+            <div className="px-4 py-3 border-b border-surface-3 flex justify-between items-center">
+              <div className="text-sm font-semibold text-red-400">{unpaid.length} member{unpaid.length > 1 ? "s" : ""} not yet contributed this month</div>
+              <a href="/contributions" className="text-xs text-brand-500 hover:text-brand-400">Record Now</a>
+            </div>
+            <div className="flex flex-wrap gap-2 px-4 py-3">
+              {unpaid.map((m) => (
+                <span key={m.id} className="px-2.5 py-1 rounded-lg bg-red-900/10 border border-red-800/20 text-xs text-red-400">
+                  {titleCase(m.name)}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-2 mb-5">
