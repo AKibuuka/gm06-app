@@ -131,6 +131,11 @@ export async function PUT(request) {
       return NextResponse.json({ error: "Only pending loans can be approved" }, { status: 400 });
     }
 
+    // Cannot approve your own loan
+    if (loan.member_id === session.id) {
+      return NextResponse.json({ error: "You cannot approve your own loan request" }, { status: 400 });
+    }
+
     // First approval
     if (!loan.approved_by_1) {
       const { data, error } = await db.from("loans")

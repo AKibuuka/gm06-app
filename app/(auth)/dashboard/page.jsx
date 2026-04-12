@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Lan
 import { CLUB_SHORT } from "@/lib/constants";
 import useTitle from "@/lib/useTitle";
 import Avatar, { titleCase } from "@/components/Avatar";
+import AdminNotifications from "@/components/AdminNotifications";
 
 function MemberDashboard({ hideHeader = false }) {
   useTitle("Dashboard");
@@ -518,6 +519,7 @@ export default function DashboardPage() {
   if (user.role === "admin") {
     return (
       <>
+        <AdminNotifications />
         <AdminDashboard />
         <div className="mt-8 pt-8 border-t border-surface-3">
           <div className="mb-4">

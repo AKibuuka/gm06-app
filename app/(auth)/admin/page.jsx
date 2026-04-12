@@ -451,12 +451,18 @@ export default function AdminPage() {
                         ) : (
                           <span className="px-2 py-0.5 rounded bg-surface-2 text-gray-500">Awaiting 1st</span>
                         )}
-                        <span className="px-2 py-0.5 rounded bg-surface-2 text-gray-500">Awaiting 2nd</span>
+                        {l.approved_by_1 ? (
+                          <span className="px-2 py-0.5 rounded bg-surface-2 text-gray-500">Awaiting 2nd</span>
+                        ) : null}
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleLoanAction(l.id, "approve")} className={`${btnPrimary} px-4 text-xs`}>Approve</button>
-                        <button onClick={() => setConfirm({ title: "Reject Loan", message: `Reject ${l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}'s loan request for ${fmtUGX(l.amount)}?`, onConfirm: () => handleLoanAction(l.id, "reject"), confirmText: "Reject", danger: true })} className={`${btnSecondary} px-4 text-xs`}>Reject</button>
-                      </div>
+                      {l.approved_by_1 === user.id ? (
+                        <div className="text-xs text-amber-400 bg-amber-900/10 border border-amber-800/20 rounded-lg px-3 py-2">You already approved this loan. A different admin must provide the 2nd approval.</div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button onClick={() => handleLoanAction(l.id, "approve")} className={`${btnPrimary} px-4 text-xs`}>{l.approved_by_1 ? "Approve (2nd)" : "Approve (1st)"}</button>
+                          <button onClick={() => setConfirm({ title: "Reject Loan", message: `Reject ${l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}'s loan request for ${fmtUGX(l.amount)}?`, onConfirm: () => handleLoanAction(l.id, "reject"), confirmText: "Reject", danger: true })} className={`${btnSecondary} px-4 text-xs`}>Reject</button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
