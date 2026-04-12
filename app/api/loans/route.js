@@ -4,6 +4,7 @@ import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 import { getMemberValuation } from "@/lib/valuation";
 import { calculateTotalDue, calculateRemaining, getDueDate, isOverdue, calculateTotalWithInterest } from "@/lib/loans";
+import { logAudit } from "@/lib/audit";
 
 // GET /api/loans?status=pending&member_id=xxx
 export async function GET(request) {
@@ -140,6 +141,7 @@ export async function PUT(request) {
         .single();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      await logAudit(session.id, "approve_first", "loan", id, { member_id: loan.member_id, amount: loan.amount });
       return NextResponse.json({ ...data, message: "First approval recorded (1/2)" });
     }
 
@@ -167,6 +169,7 @@ export async function PUT(request) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await logAudit(session.id, "activate", "loan", id, { member_id: loan.member_id, amount: loan.amount, total_due: totalDue });
     return NextResponse.json({ ...data, message: "Loan activated (2/2 approvals)" });
   }
 
@@ -182,6 +185,7 @@ export async function PUT(request) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await logAudit(session.id, "reject", "loan", id, { member_id: loan.member_id, amount: loan.amount, notes: notes || null });
     return NextResponse.json(data);
   }
 

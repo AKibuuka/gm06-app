@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 export const maxDuration = 15;
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
+import { logAudit } from "@/lib/audit";
 
 export async function GET(request) {
   const session = await getSession();
@@ -43,6 +44,7 @@ export async function POST(request) {
     member_id, amount: parseFloat(amount), type: "fine", description: `Fine: ${reason}`, date: date || new Date().toISOString().split("T")[0],
   });
 
+  await logAudit(session.id, "create", "fine", fine.id, { member_id, amount: parseFloat(amount), reason });
   return NextResponse.json(fine);
 }
 
@@ -54,5 +56,6 @@ export async function PUT(request) {
   const db = getServiceClient();
   const { data, error } = await db.from("fines").update({ is_paid }).eq("id", id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await logAudit(session.id, "update", "fine", id, { is_paid });
   return NextResponse.json(data);
 }

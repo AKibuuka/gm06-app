@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
-import { Plus, DollarSign, ArrowDown, ArrowUp, AlertTriangle } from "lucide-react";
+import { Plus, DollarSign, ArrowDown, ArrowUp, AlertTriangle, Pencil } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import { fmtUGX, fmtShort, fmtDate } from "@/lib/format";
 import useTitle from "@/lib/useTitle";
@@ -33,6 +33,8 @@ export default function ContributionsPage() {
   const [batchAmounts, setBatchAmounts] = useState({});
   const [batchRefs, setBatchRefs] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState({ id: "", amount: "", type: "deposit", description: "", bank_ref: "", date: "" });
 
   useEffect(() => {
     const fetches = [fetch("/api/contributions").then((r) => r.json())];
@@ -94,6 +96,23 @@ export default function ContributionsPage() {
     toast?.(msg, "success");
   }
 
+  async function handleEdit(e) {
+    e.preventDefault(); setSubmitting(true);
+    const res = await fetch("/api/contributions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editForm) });
+    if (res.ok) {
+      const data = await res.json();
+      setContributions(contributions.map((c) => c.id === data.id ? data : c));
+      setShowEdit(false);
+      toast?.("Contribution updated", "success");
+    } else { const err = await res.json(); toast?.(err.error, "error"); }
+    setSubmitting(false);
+  }
+
+  function openEdit(c) {
+    setEditForm({ id: c.id, amount: c.amount, type: c.type, description: c.description || "", bank_ref: c.bank_ref || "", date: c.date });
+    setShowEdit(true);
+  }
+
   if (loading) return <SkeletonPage cards={3} rows={6} />;
 
   return (
@@ -134,8 +153,8 @@ export default function ContributionsPage() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden"><div className="overflow-x-auto"><div className={`${isAdmin ? "min-w-[700px]" : "min-w-[550px]"}`}>
-        <div className={`grid ${isAdmin ? "grid-cols-6" : "grid-cols-5"} items-center px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide`}>
-          <span>DATE</span>{isAdmin && <span>MEMBER</span>}<span>TYPE</span><span className="text-right">AMOUNT</span><span>BANK REF</span><span>DESCRIPTION</span>
+        <div className={`grid ${isAdmin ? "grid-cols-[1fr_1fr_80px_1fr_1fr_1fr_40px]" : "grid-cols-5"} items-center px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide`}>
+          <span>DATE</span>{isAdmin && <span>MEMBER</span>}<span>TYPE</span><span className="text-right">AMOUNT</span><span>BANK REF</span><span>DESCRIPTION</span>{isAdmin && <span></span>}
         </div>
         {filtered.length === 0 ? (
           <div className="px-5 py-12 text-center text-gray-500 text-sm">No contributions found</div>
@@ -144,13 +163,14 @@ export default function ContributionsPage() {
             const style = TYPE_STYLES[c.type] || TYPE_STYLES.deposit;
             const Icon = style.icon;
             return (
-              <div key={c.id} className={`grid ${isAdmin ? "grid-cols-6" : "grid-cols-5"} items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]`}>
+              <div key={c.id} className={`grid ${isAdmin ? "grid-cols-[1fr_1fr_80px_1fr_1fr_1fr_40px]" : "grid-cols-5"} items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]`}>
                 <div className="font-mono text-gray-400">{fmtDate(c.date)}</div>
                 {isAdmin && <div className="font-medium">{c.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "—"}</div>}
                 <div><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${style.bg}`}><Icon size={10} />{c.type}</span></div>
                 <div className="text-right font-mono font-semibold">{fmtUGX(c.amount)}</div>
                 <div className="text-gray-500 text-xs font-mono truncate">{c.bank_ref || "—"}</div>
                 <div className="text-gray-500 text-xs truncate">{c.description || "—"}</div>
+                {isAdmin && <div><button onClick={() => openEdit(c)} className="p-1 rounded hover:bg-surface-3 text-gray-500 hover:text-white"><Pencil size={12} /></button></div>}
               </div>
             );
           })
@@ -163,10 +183,22 @@ export default function ContributionsPage() {
           <FormField label="Member"><select value={form.member_id} onChange={(e) => setForm({ ...form, member_id: e.target.value })} required className={selectClass}><option value="">Select...</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</option>)}</select></FormField>
           <FormField label="Type"><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className={selectClass}><option value="deposit">Deposit</option><option value="expense">Expense</option><option value="withdrawal">Withdrawal</option></select></FormField>
           <FormField label="Amount (UGX)"><input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required min="1" className={inputClass} /></FormField>
-          <FormField label="Date"><input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required className={inputClass} /></FormField>
+          <FormField label="Date"><input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required max={new Date().toISOString().split("T")[0]} className={inputClass} /></FormField>
           <FormField label="Bank Reference"><input type="text" value={form.bank_ref} onChange={(e) => setForm({ ...form, bank_ref: e.target.value })} className={inputClass} placeholder="e.g. TXN-20260401-001" /></FormField>
           <FormField label="Description"><input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="e.g. April 2026 deposit" /></FormField>
           <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowAdd(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Saving..." : "Record"}</button></div>
+        </form>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Contribution">
+        <form onSubmit={handleEdit} className="space-y-1">
+          <FormField label="Type"><select value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })} className={selectClass}><option value="deposit">Deposit</option><option value="expense">Expense</option><option value="withdrawal">Withdrawal</option><option value="fine">Fine</option></select></FormField>
+          <FormField label="Amount (UGX)"><input type="number" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} required min="0" className={inputClass} /></FormField>
+          <FormField label="Date"><input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} required max={new Date().toISOString().split("T")[0]} className={inputClass} /></FormField>
+          <FormField label="Bank Reference"><input type="text" value={editForm.bank_ref} onChange={(e) => setEditForm({ ...editForm, bank_ref: e.target.value })} className={inputClass} /></FormField>
+          <FormField label="Description"><input type="text" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className={inputClass} /></FormField>
+          <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowEdit(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Saving..." : "Save Changes"}</button></div>
         </form>
       </Modal>
 

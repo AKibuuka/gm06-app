@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
+import { logAudit } from "@/lib/audit";
 
 // GET /api/settings — returns all settings (admin only)
 export async function GET() {
@@ -41,9 +42,15 @@ export async function PUT(request) {
     }
   }
 
+  // Fetch old values for audit
+  const { data: oldSettings } = await db.from("settings").select("key, value").in("key", Object.keys(updates));
+  const oldMap = {};
+  (oldSettings || []).forEach((s) => { oldMap[s.key] = s.value; });
+
   for (const [key, value] of Object.entries(updates)) {
     await db.from("settings").upsert({ key, value: String(value), updated_at: new Date().toISOString() }, { onConflict: "key" });
   }
 
+  await logAudit(session.id, "update", "setting", null, { before: oldMap, after: updates });
   return NextResponse.json({ ok: true });
 }

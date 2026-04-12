@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
+import { logAudit } from "@/lib/audit";
 
 export async function GET() {
   const session = await getSession();
@@ -31,6 +32,7 @@ export async function POST(request) {
   }).select().single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await logAudit(session.id, "create", "investment", data.id, { name: data.name, asset_class: data.asset_class, current_value: data.current_value });
   return NextResponse.json(data);
 }
 
@@ -55,6 +57,7 @@ export async function PUT(request) {
   updates.updated_at = new Date().toISOString();
   const { data, error } = await db.from("investments").update(updates).eq("id", id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await logAudit(session.id, "update", "investment", id, { updates });
   return NextResponse.json(data);
 }
 
@@ -67,5 +70,6 @@ export async function DELETE(request) {
   // Soft delete
   const { error } = await db.from("investments").update({ is_active: false }).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await logAudit(session.id, "delete", "investment", id, {});
   return NextResponse.json({ ok: true });
 }

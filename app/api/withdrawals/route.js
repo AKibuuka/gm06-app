@@ -3,6 +3,7 @@ export const maxDuration = 15;
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 import { getMemberValuation } from "@/lib/valuation";
+import { logAudit } from "@/lib/audit";
 
 // GET /api/withdrawals
 export async function GET(request) {
@@ -69,6 +70,7 @@ export async function PUT(request) {
       status: "approved", approved_by: session.id, approved_at: new Date().toISOString(),
     }).eq("id", id).select("*").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await logAudit(session.id, "approve", "withdrawal", id, { member_id: wr.member_id, amount: wr.amount });
     return NextResponse.json(data);
   }
 
@@ -83,6 +85,7 @@ export async function PUT(request) {
       status: "completed", completed_at: new Date().toISOString(), notes: notes || null,
     }).eq("id", id).select("*").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await logAudit(session.id, "complete", "withdrawal", id, { member_id: wr.member_id, amount: wr.amount });
     return NextResponse.json(data);
   }
 
@@ -91,6 +94,7 @@ export async function PUT(request) {
       status: "rejected", rejected_at: new Date().toISOString(), notes: notes || null,
     }).eq("id", id).select("*").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await logAudit(session.id, "reject", "withdrawal", id, { member_id: wr.member_id, amount: wr.amount, notes: notes || null });
     return NextResponse.json(data);
   }
 

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { useRouter } from "next/navigation";
-import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark, Megaphone, Trash2 } from "lucide-react";
+import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark, Megaphone, Trash2, ScrollText } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import Confirm from "@/components/Confirm";
 import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS } from "@/lib/format";
@@ -16,6 +16,7 @@ const TABS = [
   { id: "fines", label: "Fines", icon: AlertTriangle },
   { id: "loans", label: "Loans", icon: Landmark },
   { id: "announcements", label: "Announce", icon: Megaphone },
+  { id: "audit", label: "Audit Log", icon: ScrollText },
 ];
 const ASSET_CLASSES = ["fixed_income", "stocks", "digital_assets", "real_estate", "private_equity", "loans", "cash"];
 
@@ -33,6 +34,7 @@ export default function AdminPage() {
   const [fines, setFines] = useState([]);
   const [loans, setLoans] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [snapshots, setSnapshots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -76,6 +78,12 @@ export default function AdminPage() {
       setLoading(false);
     }).catch(() => { toast?.("Failed to load data", "error"); setLoading(false); });
   }, [user]);
+
+  // Lazy-load audit logs when tab is selected
+  useEffect(() => {
+    if (tab !== "audit" || auditLogs.length > 0) return;
+    fetch("/api/audit?limit=200").then((r) => r.json()).then((d) => setAuditLogs(Array.isArray(d) ? d : []));
+  }, [tab]);
 
   if (!user || user.role !== "admin") return null;
   if (loading) return <div className="text-gray-500 text-sm p-8">Loading admin panel...</div>;
@@ -568,6 +576,92 @@ export default function AdminPage() {
                 </div>
               </form>
             </Modal>
+          </div>
+        );
+      })()}
+
+      {/* ═══ AUDIT LOG ═══ */}
+      {tab === "audit" && (() => {
+        const ACTION_LABELS = {
+          create: "Created", update: "Updated", delete: "Deleted", deactivate: "Deactivated",
+          approve_first: "Approved (1/2)", activate: "Activated (2/2)", approve: "Approved",
+          reject: "Rejected", complete: "Completed",
+        };
+        const ENTITY_STYLES = {
+          contribution: "bg-green-900/20 text-green-400",
+          loan: "bg-amber-900/20 text-amber-400",
+          member: "bg-blue-900/20 text-blue-400",
+          investment: "bg-purple-900/20 text-purple-400",
+          fine: "bg-red-900/20 text-red-400",
+          setting: "bg-gray-800/40 text-gray-400",
+          withdrawal: "bg-cyan-900/20 text-cyan-400",
+        };
+        const [auditFilter, setAuditFilter] = useState("");
+        const filtered = auditFilter ? auditLogs.filter((l) => l.entity_type === auditFilter) : auditLogs;
+
+        function formatDetails(log) {
+          const d = log.details || {};
+          if (log.entity_type === "contribution") {
+            if (log.action === "create") return `${fmtUGX(d.amount)} ${d.type} on ${d.date}`;
+            if (log.action === "update") {
+              const changes = Object.entries(d.after || {}).map(([k, v]) => `${k}: ${d.before?.[k] ?? "—"} → ${v}`);
+              return changes.join(", ");
+            }
+            if (log.action === "delete") return `${fmtUGX(d.deleted?.amount)} ${d.deleted?.type} on ${d.deleted?.date}`;
+          }
+          if (log.entity_type === "loan") return `${fmtUGX(d.amount)}${d.total_due ? ` (total due: ${fmtUGX(d.total_due)})` : ""}`;
+          if (log.entity_type === "member") {
+            if (log.action === "create") return `${d.name} (${d.email})`;
+            if (log.action === "update") return Object.entries(d.updates || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+          }
+          if (log.entity_type === "investment") {
+            if (log.action === "create") return `${d.name} — ${fmtUGX(d.current_value)}`;
+          }
+          if (log.entity_type === "fine") return `${fmtUGX(d.amount)} — ${d.reason || ""}`;
+          if (log.entity_type === "setting") {
+            return Object.entries(d.after || {}).map(([k, v]) => `${k}: ${d.before?.[k] ?? "—"} → ${v}`).join(", ");
+          }
+          if (log.entity_type === "withdrawal") return `${fmtUGX(d.amount)}`;
+          return JSON.stringify(d).slice(0, 80);
+        }
+
+        return (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-sm text-gray-500">{filtered.length} log entries</span>
+              <div className="flex gap-2">
+                <select value={auditFilter} onChange={(e) => setAuditFilter(e.target.value)} className={`${selectClass} w-44 text-xs`}>
+                  <option value="">All types</option>
+                  <option value="contribution">Contributions</option>
+                  <option value="loan">Loans</option>
+                  <option value="member">Members</option>
+                  <option value="investment">Investments</option>
+                  <option value="fine">Fines</option>
+                  <option value="setting">Settings</option>
+                  <option value="withdrawal">Withdrawals</option>
+                </select>
+                <button onClick={() => { setAuditLogs([]); fetch("/api/audit?limit=200").then((r) => r.json()).then((d) => setAuditLogs(Array.isArray(d) ? d : [])); }} className={`${btnSecondary} px-3 text-xs`}>Refresh</button>
+              </div>
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="card text-center py-8 text-gray-500 text-sm">No audit log entries yet</div>
+            ) : (
+              <div className="card p-0 overflow-hidden"><div className="overflow-x-auto"><div className="min-w-[700px]">
+                <div className="grid grid-cols-[140px_120px_90px_80px_1fr] items-center px-5 py-2.5 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold">
+                  <span>DATE</span><span>ADMIN</span><span>ACTION</span><span>TYPE</span><span>DETAILS</span>
+                </div>
+                {filtered.slice(0, 200).map((log) => (
+                  <div key={log.id} className="grid grid-cols-[140px_120px_90px_80px_1fr] items-center px-5 py-2.5 border-b border-surface-3 text-[13px]">
+                    <div className="font-mono text-gray-500 text-xs">{new Date(log.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                    <div className="text-sm truncate">{log.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "—"}</div>
+                    <div className="text-xs font-semibold">{ACTION_LABELS[log.action] || log.action}</div>
+                    <div><span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${ENTITY_STYLES[log.entity_type] || "bg-surface-2 text-gray-400"}`}>{log.entity_type}</span></div>
+                    <div className="text-xs text-gray-400 truncate">{formatDetails(log)}</div>
+                  </div>
+                ))}
+              </div></div></div>
+            )}
           </div>
         );
       })()}

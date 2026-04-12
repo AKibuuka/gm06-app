@@ -3,6 +3,7 @@ export const maxDuration = 15;
 import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 import { calculateTotalDue, isOverdue } from "@/lib/loans";
+import { logAudit } from "@/lib/audit";
 
 // GET /api/contributions?member_id=xxx&from=2026-01-01&to=2026-03-31
 export async function GET(request) {
@@ -53,6 +54,11 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }
 
+  const contribDate = date || new Date().toISOString().split("T")[0];
+  if (contribDate > new Date().toISOString().split("T")[0]) {
+    return NextResponse.json({ error: "Contribution date cannot be in the future" }, { status: 400 });
+  }
+
   const db = getServiceClient();
   const { data, error } = await db
     .from("contributions")
@@ -62,7 +68,7 @@ export async function POST(request) {
       type,
       description: description || null,
       bank_ref: bank_ref || null,
-      date: date || new Date().toISOString().split("T")[0],
+      date: contribDate,
     })
     .select("*, members(name)")
     .single();
@@ -137,6 +143,66 @@ export async function POST(request) {
     }
   }
 
+  await logAudit(session.id, "create", "contribution", data.id, { member_id, amount: parseFloat(amount), type, date: contribDate, bank_ref: bank_ref || null });
+
+  return NextResponse.json(data);
+}
+
+// PUT /api/contributions — edit a contribution (admin only)
+export async function PUT(request) {
+  const session = await getSession();
+  if (!session || !isAdmin(session)) {
+    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+  }
+
+  const { id, amount, type, description, date, bank_ref } = await request.json();
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+  const db = getServiceClient();
+
+  // Fetch existing for audit trail
+  const { data: existing } = await db.from("contributions").select("*").eq("id", id).single();
+  if (!existing) return NextResponse.json({ error: "Contribution not found" }, { status: 404 });
+
+  if (type && !["deposit", "fine", "expense", "withdrawal"].includes(type)) {
+    return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+  }
+
+  const newDate = date || existing.date;
+  if (newDate > new Date().toISOString().split("T")[0]) {
+    return NextResponse.json({ error: "Contribution date cannot be in the future" }, { status: 400 });
+  }
+
+  const updates = {};
+  if (amount !== undefined) updates.amount = parseFloat(amount);
+  if (type !== undefined) updates.type = type;
+  if (description !== undefined) updates.description = description || null;
+  if (date !== undefined) updates.date = date;
+  if (bank_ref !== undefined) updates.bank_ref = bank_ref || null;
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+  }
+
+  const { data, error } = await db
+    .from("contributions")
+    .update(updates)
+    .eq("id", id)
+    .select("*, members(name)")
+    .single();
+
+  if (error) {
+    if (error.code === "23505" && error.message?.includes("bank_ref")) {
+      return NextResponse.json({ error: "A contribution with this bank reference already exists" }, { status: 400 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  await logAudit(session.id, "update", "contribution", id, {
+    before: { amount: existing.amount, type: existing.type, date: existing.date, description: existing.description, bank_ref: existing.bank_ref },
+    after: updates,
+  });
+
   return NextResponse.json(data);
 }
 
@@ -149,8 +215,18 @@ export async function DELETE(request) {
 
   const { id } = await request.json();
   const db = getServiceClient();
+
+  // Fetch existing for audit trail
+  const { data: existing } = await db.from("contributions").select("*").eq("id", id).single();
+
   const { error } = await db.from("contributions").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  if (existing) {
+    await logAudit(session.id, "delete", "contribution", id, {
+      deleted: { member_id: existing.member_id, amount: existing.amount, type: existing.type, date: existing.date, bank_ref: existing.bank_ref },
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

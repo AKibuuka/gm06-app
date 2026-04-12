@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 export const maxDuration = 15;
 import { getSession, isAdmin, hashPassword, generateDefaultPassword } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
+import { logAudit } from "@/lib/audit";
 
 export async function GET() {
   const session = await getSession();
@@ -81,6 +82,7 @@ export async function POST(request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
+  await logAudit(session.id, "create", "member", data.id, { name: data.name, email: data.email, role: data.role });
   return NextResponse.json({ ...data, default_password: defaultPwd });
 }
 
@@ -118,6 +120,7 @@ export async function PUT(request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await logAudit(session.id, "update", "member", id, { updates });
   return NextResponse.json(data);
 }
 
@@ -133,5 +136,6 @@ export async function DELETE(request) {
   const db = getServiceClient();
   const { error } = await db.from("members").update({ is_active: false }).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await logAudit(session.id, "deactivate", "member", id, {});
   return NextResponse.json({ ok: true });
 }
