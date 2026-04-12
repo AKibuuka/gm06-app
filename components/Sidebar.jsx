@@ -1,6 +1,6 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSign, Settings, X, Landmark, MessageSquare, Search, ArrowUpRight } from "lucide-react";
+import { LayoutDashboard, Users, PieChart, FileText, LogOut, RefreshCw, DollarSign, Settings, X, Landmark, MessageSquare, Search, ArrowUpRight, Vote } from "lucide-react";
 import { useState, useEffect } from "react";
 import SearchModal from "./SearchModal";
 import { useToast } from "./Toast";
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/loans", label: "Loans", icon: Landmark },
   { href: "/withdrawals", label: "Withdrawals", icon: ArrowUpRight },
   { href: "/messages", label: "Messages", icon: MessageSquare },
+  { href: "/voting", label: "Voting", icon: Vote },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
