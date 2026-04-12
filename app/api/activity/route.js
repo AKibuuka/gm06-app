@@ -27,7 +27,7 @@ export async function GET() {
   // Recent loans (last 5)
   const { data: loans } = await db
     .from("loans")
-    .select("id, amount, status, requested_at, members(name)")
+    .select("id, amount, status, requested_at, members!loans_member_id_fkey(name)")
     .order("requested_at", { ascending: false })
     .limit(5);
 

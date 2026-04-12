@@ -39,7 +39,7 @@ export async function GET(request) {
   const contributions = [...contribMap.values()].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
 
   // Search loans (by reason)
-  let loanQuery = db.from("loans").select("id, amount, status, reason, members(name)").ilike("reason", pattern).order("requested_at", { ascending: false }).limit(5);
+  let loanQuery = db.from("loans").select("id, amount, status, reason, members!loans_member_id_fkey(name)").ilike("reason", pattern).order("requested_at", { ascending: false }).limit(5);
   if (!admin) loanQuery = loanQuery.eq("member_id", session.id);
   const { data: loans } = await loanQuery;
 
