@@ -245,7 +245,7 @@ export default function SettingsPage() {
                 <input type="number" step="1" min="0" max="100" value={settings.max_loan_pct || ""} onChange={(e) => setSettings({ ...settings, max_loan_pct: e.target.value })} className={inputClass} />
                 <p className="text-[11px] text-gray-500 mt-1">Members can borrow up to this % of their portfolio value. Current: {settings.max_loan_pct || "80"}%</p>
               </FormField>
-              <FormField label="Loan Interest Rate (% per quarter)">
+              <FormField label="Loan Interest Rate (% flat on loan)">
                 <input type="number" step="0.1" min="0" value={settings.loan_interest_rate || ""} onChange={(e) => setSettings({ ...settings, loan_interest_rate: e.target.value })} className={inputClass} />
                 <p className="text-[11px] text-gray-500 mt-1">Flat interest rate for the 3-month loan period. Current: {settings.loan_interest_rate || "10"}%</p>
               </FormField>

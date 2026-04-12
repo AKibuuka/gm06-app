@@ -432,7 +432,7 @@ export default function AdminPage() {
                         </div>
                         <div className="text-right">
                           <div className="text-lg font-bold font-mono">{fmtUGX(l.amount)}</div>
-                          <div className="text-[11px] text-gray-500">{l.interest_rate}% quarterly</div>
+                          <div className="text-[11px] text-gray-500">{l.interest_rate}% flat interest</div>
                         </div>
                       </div>
                       {l.reason && <div className="text-xs text-gray-400 mb-3">Reason: {l.reason}</div>}

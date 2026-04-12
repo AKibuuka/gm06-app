@@ -216,22 +216,58 @@ function MemberDashboard({ hideHeader = false }) {
               </div>
 
               {/* Active Loan */}
-              {active_loan && (
-                <div className="card" style={{ borderColor: "rgba(59,130,246,0.3)", background: "rgba(30,58,138,0.08)" }}>
-                  <div className="flex items-center gap-2 text-blue-400 text-sm font-semibold mb-3"><Landmark size={16} /> Active Loan</div>
-                  <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                    <div><span className="text-xs text-gray-500">Amount</span><div className="font-mono font-semibold">{fmtUGX(active_loan.amount)}</div></div>
-                    <div><span className="text-xs text-gray-500">Remaining</span><div className="font-mono font-semibold text-amber-400">{fmtUGX(Math.max(0, (active_loan.total_due || active_loan.amount) - active_loan.amount_paid))}</div></div>
-                  </div>
-                  {active_loan.status === "active" && active_loan.total_due > 0 && (
-                    <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (active_loan.amount_paid / active_loan.total_due) * 100)}%` }} />
+              {active_loan && (() => {
+                const totalDue = active_loan.total_due || active_loan.amount;
+                const remaining = Math.max(0, totalDue - (active_loan.amount_paid || 0));
+                const paidPct = totalDue > 0 ? Math.min(100, ((active_loan.amount_paid || 0) / totalDue) * 100) : 0;
+                const dueDate = active_loan.activated_at ? new Date(new Date(active_loan.activated_at).setMonth(new Date(active_loan.activated_at).getMonth() + 3)) : null;
+                const overdue = active_loan.status === "active" && dueDate && new Date() > dueDate;
+                const borderColor = overdue ? "rgba(239,68,68,0.4)" : active_loan.status === "active" ? "rgba(59,130,246,0.3)" : "rgba(217,119,6,0.3)";
+                const bgColor = overdue ? "rgba(127,29,29,0.08)" : active_loan.status === "active" ? "rgba(30,58,138,0.08)" : "rgba(120,53,15,0.08)";
+
+                return (
+                  <div className="card" style={{ borderColor, background: bgColor }}>
+                    {overdue && (
+                      <div className="bg-red-900/20 border border-red-800/30 text-red-400 text-xs rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
+                        <AlertTriangle size={14} /> Loan overdue — all contributions go to recovery
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: overdue ? "#F87171" : active_loan.status === "active" ? "#60A5FA" : "#FBBF24" }}>
+                        <Landmark size={16} />
+                        {active_loan.status === "active" ? "Active Loan" : "Loan Request"}
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${overdue ? "bg-red-900/20 text-red-400" : active_loan.status === "active" ? "bg-blue-900/20 text-blue-400" : "bg-amber-900/20 text-amber-400"}`}>
+                        {overdue ? "Overdue" : active_loan.status === "pending" ? (active_loan.approved_by_1 ? "Approved (1/2)" : "Pending") : active_loan.status === "active" ? "Active" : "Approved"}
+                      </span>
                     </div>
-                  )}
-                  {active_loan.status === "pending" && <div className="text-xs text-amber-400">Awaiting admin approval{active_loan.approved_by_1 ? " (1/2)" : ""}</div>}
-                  <a href="/loans" className="text-xs text-brand-500 hover:text-brand-400 mt-2 inline-block">View details</a>
-                </div>
-              )}
+
+                    <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                      <div><span className="text-xs text-gray-500">Loan Amount</span><div className="font-mono font-semibold">{fmtUGX(active_loan.amount)}</div></div>
+                      <div><span className="text-xs text-gray-500">Total Due</span><div className="font-mono font-semibold">{fmtUGX(totalDue)}</div></div>
+                      <div><span className="text-xs text-gray-500">Remaining</span><div className={`font-mono font-semibold ${overdue ? "text-red-400" : "text-amber-400"}`}>{fmtUGX(remaining)}</div></div>
+                      {dueDate && <div><span className="text-xs text-gray-500">Due By</span><div className={`font-mono font-semibold ${overdue ? "text-red-400" : ""}`}>{fmtDate(dueDate)}</div></div>}
+                    </div>
+
+                    {active_loan.status === "active" && totalDue > 0 && (
+                      <div className="mb-3">
+                        <div className="flex justify-between text-[11px] text-gray-500 mb-1">
+                          <span>Repaid</span>
+                          <span>{Math.round(paidPct)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${overdue ? "bg-red-500" : "bg-blue-500"}`} style={{ width: `${paidPct}%` }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {active_loan.status === "pending" && !active_loan.activated_at && (
+                      <div className="text-xs text-amber-400 mb-2">Awaiting admin approval{active_loan.approved_by_1 ? " (1 of 2 approved)" : ""}</div>
+                    )}
+                    <a href="/loans" className="text-xs text-brand-500 hover:text-brand-400 inline-block">View details &rarr;</a>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="space-y-4">

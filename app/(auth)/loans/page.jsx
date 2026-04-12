@@ -91,7 +91,7 @@ export default function LoansPage() {
             <Landmark size={18} className="text-brand-500" />
             <span className="text-sm font-semibold">Loan Eligibility</span>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
               <div className="text-xs text-gray-500">Your Portfolio</div>
               <div className="text-lg font-bold font-mono">{fmtUGX(portfolioValue)}</div>
@@ -101,21 +101,19 @@ export default function LoansPage() {
               <div className="text-lg font-bold font-mono text-brand-500">{fmtUGX(maxAmount)}</div>
             </div>
             <div>
-              <div className="text-xs text-gray-500">Interest Rate</div>
+              <div className="text-xs text-gray-500">Interest</div>
               <div className="text-lg font-bold font-mono">{interestRate}%</div>
-              <div className="text-[11px] text-gray-500">per quarter (3 months)</div>
-            </div>
-            <div className="flex items-end">
-              {portfolioValue > 0 ? (
-                <button onClick={() => setShowRequest(true)} className={`w-full ${btnPrimary} flex items-center justify-center gap-2`}>
-                  <Plus size={14} /> Request a Loan
-                </button>
-              ) : (
-                <div className="text-xs text-gray-500">No portfolio value yet</div>
-              )}
+              <div className="text-[11px] text-gray-500">flat on the loan</div>
             </div>
           </div>
-          <p className="text-[11px] text-gray-500">Loans are quarterly (3 months). Requires 2 admin approvals. Repayments are auto-deducted from contributions. If not paid within 3 months, all contributions go to loan recovery.</p>
+          {portfolioValue > 0 ? (
+            <button onClick={() => setShowRequest(true)} className={`w-full sm:w-auto ${btnPrimary} flex items-center justify-center gap-2 px-6`}>
+              <Plus size={14} /> Request a Loan
+            </button>
+          ) : (
+            <div className="text-xs text-gray-500">No portfolio value yet — contribute first</div>
+          )}
+          <p className="text-[11px] text-gray-500 mt-4">Loans must be repaid within 3 months. Requires 2 admin approvals. Repayments are auto-deducted from contributions. If not paid within 3 months, all contributions go to loan recovery.</p>
         </div>
       )}
 
@@ -140,12 +138,12 @@ export default function LoansPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
-            <div><div className="text-xs text-gray-500">Loan Amount</div><div className="text-lg font-bold font-mono">{fmtUGX(activeLoan.amount)}</div></div>
-            <div><div className="text-xs text-gray-500">Interest ({activeLoan.interest_rate}%)</div><div className="text-lg font-bold font-mono">{fmtUGX((activeLoan.calculated_total_due || activeLoan.total_due || 0) - (activeLoan.amount || 0))}</div></div>
-            <div><div className="text-xs text-gray-500">Total Due</div><div className="text-lg font-bold font-mono">{fmtUGX(activeLoan.calculated_total_due || activeLoan.total_due || 0)}</div></div>
-            <div><div className="text-xs text-gray-500">Remaining</div><div className={`text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : "text-amber-400"}`}>{fmtUGX(activeLoan.remaining || 0)}</div></div>
-            {activeLoan.due_date && <div><div className="text-xs text-gray-500">Due Date</div><div className={`text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : ""}`}>{fmtDate(activeLoan.due_date)}</div></div>}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+            <div><div className="text-xs text-gray-500">Loan Amount</div><div className="text-base sm:text-lg font-bold font-mono">{fmtUGX(activeLoan.amount)}</div></div>
+            <div><div className="text-xs text-gray-500">Interest ({activeLoan.interest_rate}% flat)</div><div className="text-base sm:text-lg font-bold font-mono">{fmtUGX((activeLoan.calculated_total_due || activeLoan.total_due || 0) - (activeLoan.amount || 0))}</div></div>
+            <div><div className="text-xs text-gray-500">Total Due</div><div className="text-base sm:text-lg font-bold font-mono">{fmtUGX(activeLoan.calculated_total_due || activeLoan.total_due || 0)}</div></div>
+            <div><div className="text-xs text-gray-500">Remaining</div><div className={`text-base sm:text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : "text-amber-400"}`}>{fmtUGX(activeLoan.remaining || 0)}</div></div>
+            {activeLoan.due_date && <div><div className="text-xs text-gray-500">Due Date</div><div className={`text-base sm:text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : ""}`}>{fmtDate(activeLoan.due_date)}</div></div>}
           </div>
 
           {activeLoan.status === "active" && activeLoan.calculated_total_due > 0 && (
@@ -203,20 +201,28 @@ export default function LoansPage() {
       {/* Request Modal */}
       <Modal open={showRequest} onClose={() => setShowRequest(false)} title="Request a Loan">
         <form onSubmit={handleRequest} className="space-y-1">
-          <div className="bg-surface-2 rounded-lg p-4 mb-4 space-y-1.5 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">Your portfolio</span><span className="font-mono">{fmtUGX(portfolioValue)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Max loan ({maxPct}%)</span><span className="font-mono text-brand-500">{fmtUGX(maxAmount)}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Interest rate</span><span className="font-mono">{interestRate}% (quarterly)</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Repayment</span><span className="font-mono">3 months</span></div>
-            {form.amount > 0 && <div className="flex justify-between border-t border-surface-3 pt-1.5 mt-1"><span className="text-gray-500">You will repay</span><span className="font-mono text-white">{fmtUGX(parseFloat(form.amount) * (1 + interestRate / 100))}</span></div>}
-          </div>
           <FormField label="Loan Amount (UGX)">
             <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required min="1" max={maxAmount} className={inputClass} placeholder={`Max ${maxAmount.toLocaleString()}`} />
           </FormField>
+
+          {/* Repayment breakdown — always visible, updates live */}
+          <div className="bg-surface-2 rounded-lg p-4 mb-4 space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-gray-500">Your portfolio</span><span className="font-mono">{fmtUGX(portfolioValue)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Max loan ({maxPct}%)</span><span className="font-mono text-brand-500">{fmtUGX(maxAmount)}</span></div>
+            <div className="border-t border-surface-3 my-2" />
+            <div className="flex justify-between"><span className="text-gray-500">Loan amount</span><span className="font-mono">{form.amount > 0 ? fmtUGX(parseFloat(form.amount)) : "—"}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Interest ({interestRate}% flat on loan)</span><span className="font-mono">{form.amount > 0 ? fmtUGX(parseFloat(form.amount) * interestRate / 100) : "—"}</span></div>
+            <div className="flex justify-between font-semibold border-t border-surface-3 pt-2"><span className="text-gray-300">Total you will repay</span><span className="font-mono text-white">{form.amount > 0 ? fmtUGX(parseFloat(form.amount) * (1 + interestRate / 100)) : "—"}</span></div>
+            <div className="flex justify-between text-xs"><span className="text-gray-500">Repayment period</span><span className="font-mono text-gray-400">3 months from approval</span></div>
+            {form.amount > 0 && (
+              <div className="flex justify-between text-xs"><span className="text-gray-500">~Monthly deduction</span><span className="font-mono text-gray-400">{fmtUGX(Math.ceil(parseFloat(form.amount) * (1 + interestRate / 100) / 3))}/mo</span></div>
+            )}
+          </div>
+
           <FormField label="Reason">
             <input type="text" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} className={inputClass} placeholder="Why do you need this loan?" />
           </FormField>
-          <p className="text-[11px] text-gray-500">Requires 2 admin approvals. Must be repaid within 3 months. Repayments are auto-deducted from contributions. Overdue loans trigger full contribution recovery.</p>
+          <p className="text-[11px] text-gray-500">Requires 2 admin approvals. Repayments are auto-deducted from your contributions each month. If not fully repaid within 3 months, all contributions go entirely to loan recovery until paid off.</p>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={() => setShowRequest(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
             <button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Submitting..." : "Request Loan"}</button>
