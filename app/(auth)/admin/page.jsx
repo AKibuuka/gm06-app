@@ -214,10 +214,10 @@ export default function AdminPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-surface-1 border border-surface-3 rounded-xl p-1 w-fit overflow-x-auto">
+      <div className="flex gap-1 mb-6 bg-surface-1 border border-surface-3 rounded-xl p-1 overflow-x-auto max-w-full">
         {TABS.map((t) => {
           const Icon = t.icon;
-          return (<button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${tab === t.id ? "bg-brand-700 text-white" : "text-gray-400 hover:text-white"}`}><Icon size={16} />{t.label}</button>);
+          return (<button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm whitespace-nowrap transition-colors ${tab === t.id ? "bg-brand-700 text-white" : "text-gray-400 hover:text-white"}`}><Icon size={14} /><span className="hidden sm:inline">{t.label}</span><span className="sm:hidden">{t.label.slice(0, 3)}</span></button>);
         })}
       </div>
 
@@ -243,9 +243,9 @@ export default function AdminPage() {
           <div className="card">
             <h3 className="text-sm font-semibold mb-2">Generate Monthly Valuation</h3>
             <p className="text-xs text-gray-500 mb-4">Calculates each member's portfolio share from their contributions and current investment values. Run at the start of each month after updating prices.</p>
-            <div className="flex flex-wrap gap-3 items-end">
-              <div><label className="block text-xs text-gray-500 mb-1.5">Date</label><input type="date" value={valDate} onChange={(e) => setValDate(e.target.value)} className={inputClass} style={{ width: 180 }} /></div>
-              <button onClick={generateValuation} disabled={generating} className={`${btnPrimary} px-6 h-[42px] flex items-center gap-2`}>
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+              <div className="flex-1 sm:flex-none"><label className="block text-xs text-gray-500 mb-1.5">Date</label><input type="date" value={valDate} onChange={(e) => setValDate(e.target.value)} className={`${inputClass} w-full sm:w-44`} /></div>
+              <button onClick={generateValuation} disabled={generating} className={`${btnPrimary} px-6 h-[42px] flex items-center justify-center gap-2`}>
                 <Calculator size={16} />{generating ? "Generating..." : "Generate"}
               </button>
             </div>
@@ -259,10 +259,10 @@ export default function AdminPage() {
             <h3 className="text-sm font-semibold mb-3">History</h3>
             {snapshots.length === 0 ? <div className="py-4 text-center text-gray-500 text-sm">No valuations yet</div> : (
               <div className="divide-y divide-surface-3">{snapshots.slice(0, 12).map((s) => (
-                <div key={s.id} className="flex justify-between items-center py-2.5 text-sm">
-                  <span className="font-mono text-gray-400">{fmtDate(s.date)}</span>
-                  <span className="font-mono font-semibold">{fmtUGX(s.total_value)}</span>
-                  <span className={`text-xs font-semibold ${s.total_value >= s.total_invested ? "text-green-400" : "text-red-400"}`}>{s.total_invested > 0 ? `${(((s.total_value - s.total_invested) / s.total_invested) * 100).toFixed(1)}%` : "-"}</span>
+                <div key={s.id} className="grid grid-cols-3 items-center py-2.5 text-sm">
+                  <span className="font-mono text-gray-400 text-xs">{fmtDate(s.date)}</span>
+                  <span className="font-mono font-semibold text-right">{fmtShort(s.total_value)}</span>
+                  <span className={`text-xs font-semibold text-right ${s.total_value >= s.total_invested ? "text-green-400" : "text-red-400"}`}>{s.total_invested > 0 ? `${(((s.total_value - s.total_invested) / s.total_invested) * 100).toFixed(1)}%` : "-"}</span>
                 </div>
               ))}</div>
             )}
@@ -272,7 +272,7 @@ export default function AdminPage() {
             <div className="space-y-2">{ASSET_CLASSES.map((cls) => {
               const value = activeInvestments.filter((i) => i.asset_class === cls).reduce((s, i) => s + (i.current_value || 0), 0);
               if (!value) return null;
-              return (<div key={cls} className="flex justify-between text-sm"><span className="text-gray-400">{ASSET_CLASS_LABELS[cls]}</span><span className="font-mono">{fmtUGX(value)} <span className="text-gray-500 text-xs">({((value / totalPortfolioValue) * 100).toFixed(1)}%)</span></span></div>);
+              return (<div key={cls} className="flex justify-between items-center text-sm gap-2"><span className="text-gray-400 truncate">{ASSET_CLASS_LABELS[cls]}</span><span className="font-mono shrink-0">{fmtShort(value)} <span className="text-gray-500 text-xs">({((value / totalPortfolioValue) * 100).toFixed(1)}%)</span></span></div>);
             })}</div>
           </div>
         </div>
@@ -283,20 +283,20 @@ export default function AdminPage() {
         <div>
           <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
             <span className="text-sm text-gray-500">{members.length} members</span>
-            <div className="flex gap-2">
-              <button onClick={() => { setResetForm({ member_id: "", new_password: "" }); setShowPasswordReset(true); }} className={`${btnSecondary} px-3 flex items-center gap-2 text-xs`}><Key size={14} />Reset Password</button>
-              <button onClick={() => { setEditItem(null); setMemberForm({ name: "", email: "", phone: "", monthly_contribution: 0, role: "member" }); setShowMemberForm(true); }} className={`${btnPrimary} px-3 flex items-center gap-2 text-xs`}><Plus size={14} />Add Member</button>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => { setResetForm({ member_id: "", new_password: "" }); setShowPasswordReset(true); }} className={`${btnSecondary} px-3 flex items-center gap-2 text-xs`}><Key size={14} /><span className="hidden sm:inline">Reset Password</span><span className="sm:hidden">Reset</span></button>
+              <button onClick={() => { setEditItem(null); setMemberForm({ name: "", email: "", phone: "", monthly_contribution: 0, role: "member" }); setShowMemberForm(true); }} className={`${btnPrimary} px-3 flex items-center gap-2 text-xs`}><Plus size={14} />Add</button>
             </div>
           </div>
           <div className="card p-0 overflow-hidden">{members.map((m) => (
-            <div key={m.id} className="flex items-center justify-between px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors">
-              <div>
-                <div className="text-sm font-medium flex items-center gap-2">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}{m.role === "admin" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-700/20 text-brand-500 font-semibold">Admin</span>}</div>
-                <div className="text-[11px] text-gray-500">{m.email} · {m.phone || "—"}</div>
+            <div key={m.id} className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium flex items-center gap-2">{titleCase(m.name)}{m.role === "admin" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-700/20 text-brand-500 font-semibold shrink-0">Admin</span>}</div>
+                <div className="text-[11px] text-gray-500 truncate">{m.email}{m.phone ? ` · ${m.phone}` : ""}</div>
               </div>
-              <div className="text-right text-xs text-gray-400 hidden sm:block">Monthly: {m.monthly_contribution > 0 ? fmtUGX(m.monthly_contribution) : "None"}</div>
+              <div className="text-right text-xs text-gray-400 hidden sm:block shrink-0">Monthly: {m.monthly_contribution > 0 ? fmtUGX(m.monthly_contribution) : "None"}</div>
               <button onClick={() => { setEditItem(m); setMemberForm({ name: m.name, email: m.email, phone: m.phone || "", monthly_contribution: m.monthly_contribution || 0, role: m.role || "member" }); setShowMemberForm(true); }}
-                className="p-1.5 rounded hover:bg-surface-3 text-gray-400 hover:text-white"><Pencil size={14} /></button>
+                className="p-2 sm:p-1.5 rounded hover:bg-surface-3 text-gray-400 hover:text-white shrink-0"><Pencil size={14} /></button>
             </div>
           ))}</div>
 
@@ -342,7 +342,7 @@ export default function AdminPage() {
             if (!clsInv.length) return null;
             return (
               <div key={cls} className="card p-0 overflow-hidden mb-4">
-                <div className="px-5 py-3 border-b border-surface-3 flex justify-between items-center bg-surface-2"><span className="text-sm font-semibold">{ASSET_CLASS_LABELS[cls]}</span><span className="text-sm font-mono">{fmtUGX(clsInv.reduce((s, i) => s + (i.current_value || 0), 0))}</span></div>
+                <div className="px-4 sm:px-5 py-3 border-b border-surface-3 flex justify-between items-center gap-2 bg-surface-2"><span className="text-sm font-semibold truncate">{ASSET_CLASS_LABELS[cls]}</span><span className="text-sm font-mono shrink-0">{fmtShort(clsInv.reduce((s, i) => s + (i.current_value || 0), 0))}</span></div>
                 <div className="overflow-x-auto">{clsInv.map((inv) => (
                   <div key={inv.id} className="grid grid-cols-3 sm:grid-cols-6 items-center px-4 sm:px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
                     <div><div className="font-medium truncate">{inv.name}</div>{inv.ticker && <div className="text-[11px] text-gray-500">{inv.ticker}</div>}</div>
