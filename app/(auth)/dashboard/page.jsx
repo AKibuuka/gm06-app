@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Lan
 import { CLUB_SHORT } from "@/lib/constants";
 import useTitle from "@/lib/useTitle";
 import Avatar, { titleCase } from "@/components/Avatar";
+import { SkeletonPage } from "@/components/Skeleton";
 import AdminNotifications from "@/components/AdminNotifications";
 
 function MemberDashboard({ hideHeader = false }) {
@@ -25,7 +26,7 @@ function MemberDashboard({ hideHeader = false }) {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Clock size={18} className="animate-pulse text-gray-500 mr-2" /><span className="text-gray-500 text-sm">Loading your portfolio...</span></div>;
+  if (loading) return <SkeletonPage cards={4} rows={3} />;
   if (error) return <div className="card border-red-800/30 text-red-400 text-sm">{error}</div>;
   if (!data?.valuation) return (
     <div className="animate-in">
@@ -396,7 +397,7 @@ function AdminDashboard() {
     }).catch(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Clock size={18} className="animate-pulse text-gray-500 mr-2" /><span className="text-gray-500 text-sm">Loading club data...</span></div>;
+  if (loading) return <SkeletonPage cards={3} rows={5} />;
 
   const totalValue = portfolio?.totalValue || 0;
   const history = portfolio?.history || [];

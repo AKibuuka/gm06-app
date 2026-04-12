@@ -3,9 +3,10 @@ import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { FileText, Users, AlertTriangle, Download, Eye, Printer, FileSpreadsheet } from "lucide-react";
-import { fmtUGX, fmtShort, ASSET_CLASS_LABELS } from "@/lib/format";
+import { fmtUGX, fmtShort, titleCase, ASSET_CLASS_LABELS } from "@/lib/format";
 import { CLUB_NAME } from "@/lib/constants";
 import useTitle from "@/lib/useTitle";
+import { SkeletonPage } from "@/components/Skeleton";
 
 export default function ReportsPage() {
   const user = useUser();
@@ -39,7 +40,7 @@ export default function ReportsPage() {
     toast?.("Download started", "success");
   }
 
-  if (loading) return <div className="text-gray-500 text-sm p-8">Loading...</div>;
+  if (loading) return <SkeletonPage cards={3} rows={4} />;
 
   // ── Member View ──
   if (user?.role !== "admin") {
@@ -66,36 +67,36 @@ export default function ReportsPage() {
 
         <div className="max-w-2xl mx-auto">
           {/* Statement preview */}
-          <div className="bg-white text-gray-900 rounded-2xl p-8 mb-4">
+          <div className="card rounded-2xl p-8 mb-4" style={{ borderColor: "rgba(15,118,110,0.2)" }}>
             <div className="text-center mb-6">
-              <h2 className="text-lg font-bold text-teal-700">{CLUB_NAME}</h2>
-              <div className="text-[10px] tracking-[3px] text-gray-400">INVESTMENT CLUB</div>
+              <h2 className="text-lg font-bold text-brand-500">{CLUB_NAME}</h2>
+              <div className="text-[10px] tracking-[3px] text-gray-500">INVESTMENT CLUB</div>
             </div>
-            <div className="bg-teal-50 rounded-xl p-5 mb-5">
+            <div className="bg-brand-900/20 border border-brand-700/20 rounded-xl p-5 mb-5">
               <div className="text-xs text-gray-500 mb-1">Portfolio Holder</div>
-              <div className="text-base font-bold mb-3">{myData.member.name}</div>
+              <div className="text-base font-bold mb-3">{titleCase(myData.member.name)}</div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-gray-500 text-xs">Portfolio Value</span><br /><strong>{fmtUGX(v.portfolio_value)}</strong></div>
-                <div><span className="text-gray-500 text-xs">Total Gain</span><br /><strong className="text-green-600">{fmtUGX(v.total_gain)}</strong></div>
+                <div><span className="text-gray-500 text-xs">Total Gain</span><br /><strong className="text-green-400">{fmtUGX(v.total_gain)}</strong></div>
                 <div><span className="text-gray-500 text-xs">Total Invested</span><br /><strong>{fmtUGX(v.total_invested)}</strong></div>
-                <div><span className="text-gray-500 text-xs">Total Return</span><br /><strong className="text-green-600">{v.return_pct}%</strong></div>
+                <div><span className="text-gray-500 text-xs">Total Return</span><br /><strong className="text-green-400">{Number(v.return_pct).toFixed(1)}%</strong></div>
               </div>
             </div>
             <h3 className="text-sm font-bold mb-3">Portfolio Holdings</h3>
             <table className="w-full text-sm mb-4">
-              <thead><tr className="border-b-2 border-teal-700"><th className="text-left py-1.5 px-2 text-teal-700 text-xs">Asset Class</th><th className="text-right py-1.5 px-2 text-teal-700 text-xs">Value (UGX)</th><th className="text-right py-1.5 px-2 text-teal-700 text-xs">%</th></tr></thead>
+              <thead><tr className="border-b-2 border-brand-700"><th className="text-left py-1.5 px-2 text-brand-500 text-xs">Asset Class</th><th className="text-right py-1.5 px-2 text-brand-500 text-xs">Value (UGX)</th><th className="text-right py-1.5 px-2 text-brand-500 text-xs">%</th></tr></thead>
               <tbody>
                 {segments.map((a, i) => (
-                  <tr key={i} className="border-b border-gray-100">
+                  <tr key={i} className="border-b border-surface-3">
                     <td className="py-1.5 px-2 text-xs">{ASSET_CLASS_LABELS[a.asset_class] || a.asset_class}</td>
                     <td className="text-right py-1.5 px-2 font-mono text-xs">{Math.round(a.member_value).toLocaleString()}</td>
                     <td className="text-right py-1.5 px-2 text-xs">{a.pct}%</td>
                   </tr>
                 ))}
-                <tr className="border-t-2 border-teal-700 font-bold"><td className="py-1.5 px-2 text-xs">Total</td><td className="text-right py-1.5 px-2 font-mono text-xs">{Math.round(v.portfolio_value).toLocaleString()}</td><td className="text-right py-1.5 px-2 text-xs">100%</td></tr>
+                <tr className="border-t-2 border-brand-700 font-bold"><td className="py-1.5 px-2 text-xs">Total</td><td className="text-right py-1.5 px-2 font-mono text-xs">{Math.round(v.portfolio_value).toLocaleString()}</td><td className="text-right py-1.5 px-2 text-xs">100%</td></tr>
               </tbody>
             </table>
-            <div className="bg-teal-700 text-white rounded-lg py-2 px-4 text-center text-sm"><strong>Advance Contribution:</strong> {fmtUGX(v.advance_contribution)}</div>
+            <div className="bg-brand-700 text-white rounded-lg py-2 px-4 text-center text-sm"><strong>Advance Contribution:</strong> {fmtUGX(v.advance_contribution)}</div>
           </div>
 
           <button onClick={() => openStatement(user.id)}
@@ -158,7 +159,7 @@ export default function ReportsPage() {
               className="text-left p-3 bg-surface-2 hover:bg-surface-3 border border-surface-3 hover:border-brand-700/40 rounded-lg transition-colors group">
               <div className="flex justify-between items-start">
                 <div>
-                  <div className="text-xs font-medium">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
+                  <div className="text-xs font-medium">{titleCase(m.name)}</div>
                   <div className="text-[11px] text-gray-500 mt-0.5 font-mono">{fmtUGX(m.snapshot?.portfolio_value || 0)}</div>
                 </div>
                 <Printer size={14} className="text-gray-600 group-hover:text-brand-500 mt-0.5" />

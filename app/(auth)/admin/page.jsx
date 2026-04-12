@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark, Megaphone, Trash2, ScrollText } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import Confirm from "@/components/Confirm";
-import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS } from "@/lib/format";
+import { fmtUGX, fmtShort, fmtDate, titleCase, ASSET_CLASS_LABELS } from "@/lib/format";
 import useTitle from "@/lib/useTitle";
+import { SkeletonPage } from "@/components/Skeleton";
 
 const TABS = [
   { id: "valuation", label: "Valuation", icon: Calculator },
@@ -87,7 +88,7 @@ export default function AdminPage() {
   }, [tab]);
 
   if (!user || user.role !== "admin") return null;
-  if (loading) return <div className="text-gray-500 text-sm p-8">Loading admin panel...</div>;
+  if (loading) return <SkeletonPage cards={3} rows={5} />;
 
   const activeInvestments = investments.filter((i) => i.is_active !== false);
   const totalPortfolioValue = activeInvestments.reduce((s, i) => s + (i.current_value || 0), 0);

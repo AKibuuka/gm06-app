@@ -17,7 +17,12 @@ export default function PortfolioPage() {
   }, []);
 
   if (loading) return <SkeletonPage cards={0} rows={4} />;
-  if (!portfolio) return <div className="text-gray-500 text-sm p-8">Unable to load portfolio data.</div>;
+  if (!portfolio) return (
+    <div className="animate-in">
+      <div className="mb-7"><h1 className="text-2xl font-bold">Portfolio</h1><p className="text-sm text-gray-500 mt-1">Club-wide asset allocation and holdings</p></div>
+      <div className="card text-center py-12 text-gray-500 text-sm">Unable to load portfolio data. Try refreshing the page.</div>
+    </div>
+  );
 
   const { summary, totalValue, investments, history, last_updated } = portfolio;
   const segments = Object.entries(summary || {}).map(([cls, data]) => ({
