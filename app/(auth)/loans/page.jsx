@@ -138,31 +138,49 @@ export default function LoansPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-            <div><div className="text-xs text-gray-500">Loan Amount</div><div className="text-base sm:text-lg font-bold font-mono">{fmtUGX(activeLoan.amount)}</div></div>
-            <div><div className="text-xs text-gray-500">Interest ({activeLoan.interest_rate}% flat)</div><div className="text-base sm:text-lg font-bold font-mono">{fmtUGX((activeLoan.calculated_total_due || activeLoan.total_due || 0) - (activeLoan.amount || 0))}</div></div>
-            <div><div className="text-xs text-gray-500">Total Due</div><div className="text-base sm:text-lg font-bold font-mono">{fmtUGX(activeLoan.calculated_total_due || activeLoan.total_due || 0)}</div></div>
-            <div><div className="text-xs text-gray-500">Remaining</div><div className={`text-base sm:text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : "text-amber-400"}`}>{fmtUGX(activeLoan.remaining || 0)}</div></div>
-            {activeLoan.due_date && <div><div className="text-xs text-gray-500">Due Date</div><div className={`text-base sm:text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : ""}`}>{fmtDate(activeLoan.due_date)}</div></div>}
-          </div>
+          {(() => {
+            // For pending loans, compute expected total (interest not yet applied on server)
+            const isActive = activeLoan.status === "active";
+            const totalDue = isActive
+              ? (activeLoan.calculated_total_due || activeLoan.total_due || 0)
+              : Math.round(activeLoan.amount * (1 + activeLoan.interest_rate / 100) * 100) / 100;
+            const interest = totalDue - activeLoan.amount;
+            const remaining = isActive ? (activeLoan.remaining || 0) : totalDue;
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+                <div><div className="text-xs text-gray-500">Loan Amount</div><div className="text-base sm:text-lg font-bold font-mono">{fmtUGX(activeLoan.amount)}</div></div>
+                <div><div className="text-xs text-gray-500">Interest ({activeLoan.interest_rate}% flat)</div><div className="text-base sm:text-lg font-bold font-mono">{fmtUGX(interest)}</div></div>
+                <div><div className="text-xs text-gray-500">Total to Repay</div><div className="text-base sm:text-lg font-bold font-mono">{fmtUGX(totalDue)}</div></div>
+                <div><div className="text-xs text-gray-500">Remaining</div><div className={`text-base sm:text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : "text-amber-400"}`}>{fmtUGX(remaining)}</div></div>
+                {activeLoan.due_date && <div><div className="text-xs text-gray-500">Due Date</div><div className={`text-base sm:text-lg font-bold font-mono ${activeLoan.is_overdue ? "text-red-400" : ""}`}>{fmtDate(activeLoan.due_date)}</div></div>}
+              </div>
+            );
+          })()}
 
-          {activeLoan.status === "active" && activeLoan.calculated_total_due > 0 && (
-            <div className="mb-4">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Repayment progress</span>
-                <span>{Math.min(100, Math.round((activeLoan.amount_paid / activeLoan.calculated_total_due) * 100))}%</span>
+          {activeLoan.status === "active" && (activeLoan.calculated_total_due || activeLoan.total_due) > 0 && (() => {
+            const td = activeLoan.calculated_total_due || activeLoan.total_due;
+            const pct = Math.min(100, Math.round((activeLoan.amount_paid / td) * 100));
+            return (
+              <div className="mb-4">
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Repayment progress</span>
+                  <span>{pct}%</span>
+                </div>
+                <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${activeLoan.is_overdue ? "bg-red-500" : "bg-brand-500"}`} style={{ width: `${pct}%` }} />
+                </div>
               </div>
-              <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all ${activeLoan.is_overdue ? "bg-red-500" : "bg-brand-500"}`} style={{ width: `${Math.min(100, (activeLoan.amount_paid / activeLoan.calculated_total_due) * 100)}%` }} />
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {activeLoan.reason && <div className="text-xs text-gray-500 mb-2">Reason: <span className="text-gray-400">{activeLoan.reason}</span></div>}
           <div className="text-[11px] text-gray-500">Requested {fmtDate(activeLoan.requested_at)}{activeLoan.activated_at && ` · Activated ${fmtDate(activeLoan.activated_at)}`}</div>
 
-          {activeLoan.status === "pending" && (
+          {activeLoan.status === "pending" && !activeLoan.approved_by_1 && (
             <button onClick={() => handleCancel(activeLoan.id)} className={`mt-3 ${btnSecondary} text-xs px-3 py-1.5`}>Cancel Request</button>
+          )}
+          {activeLoan.status === "pending" && activeLoan.approved_by_1 && (
+            <div className="mt-3 text-[11px] text-amber-400">Approval in progress — this loan can no longer be cancelled</div>
           )}
 
           {/* Payment history */}

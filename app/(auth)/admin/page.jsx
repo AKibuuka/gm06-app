@@ -37,6 +37,7 @@ export default function AdminPage() {
   const [announcements, setAnnouncements] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditFilter, setAuditFilter] = useState("");
+  const [expandedLoan, setExpandedLoan] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -412,6 +413,7 @@ export default function AdminPage() {
         const activeLoans = loans.filter((l) => l.status === "active");
         const pastLoans = loans.filter((l) => ["paid", "rejected"].includes(l.status));
         const totalOutstanding = activeLoans.reduce((s, l) => s + (l.remaining || 0), 0);
+        const totalInterestEarned = pastLoans.filter((l) => l.status === "paid").reduce((s, l) => s + ((l.calculated_total_due || l.total_due || 0) - (l.amount || 0)), 0);
 
         async function handleLoanAction(loanId, action, notes) {
           try {
@@ -421,11 +423,17 @@ export default function AdminPage() {
           } catch (e) { toast?.(e.message, "error"); }
         }
 
+        function getMemberPortfolio(memberId) {
+          const m = members.find((m) => m.id === memberId);
+          return m?.snapshot?.portfolio_value || 0;
+        }
+
         return (
           <div>
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm text-gray-500">
                 {pendingLoans.length} pending · {activeLoans.length} active · Outstanding: {fmtUGX(totalOutstanding)}
+                {totalInterestEarned > 0 && <span className="text-green-400 ml-2">· Interest earned: {fmtUGX(totalInterestEarned)}</span>}
               </span>
             </div>
 
@@ -433,40 +441,54 @@ export default function AdminPage() {
               <div className="mb-6">
                 <div className="text-xs font-semibold text-amber-400 mb-2">PENDING APPROVAL</div>
                 <div className="space-y-3">
-                  {pendingLoans.map((l) => (
-                    <div key={l.id} className="card" style={{ borderColor: "rgba(217,119,6,0.3)" }}>
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <div className="text-sm font-semibold">{l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
-                          <div className="text-[11px] text-gray-500">{fmtDate(l.requested_at)}</div>
+                  {pendingLoans.map((l) => {
+                    const expectedTotal = Math.round(l.amount * (1 + l.interest_rate / 100) * 100) / 100;
+                    const expectedInterest = expectedTotal - l.amount;
+                    const portfolio = getMemberPortfolio(l.member_id);
+                    const loanPct = portfolio > 0 ? Math.round((l.amount / portfolio) * 100) : 0;
+                    return (
+                      <div key={l.id} className="card" style={{ borderColor: "rgba(217,119,6,0.3)" }}>
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <div className="text-sm font-semibold">{titleCase(l.members?.name)}</div>
+                            <div className="text-[11px] text-gray-500">{fmtDate(l.requested_at)}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold font-mono">{fmtUGX(l.amount)}</div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold font-mono">{fmtUGX(l.amount)}</div>
-                          <div className="text-[11px] text-gray-500">{l.interest_rate}% flat interest</div>
+
+                        {/* Loan breakdown */}
+                        <div className="bg-surface-2 rounded-lg p-3 mb-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                          <div><span className="text-gray-500">Principal</span><div className="font-mono font-semibold">{fmtUGX(l.amount)}</div></div>
+                          <div><span className="text-gray-500">Interest ({l.interest_rate}%)</span><div className="font-mono font-semibold">{fmtUGX(expectedInterest)}</div></div>
+                          <div><span className="text-gray-500">Total to Repay</span><div className="font-mono font-semibold text-amber-400">{fmtUGX(expectedTotal)}</div></div>
+                          <div><span className="text-gray-500">Portfolio ({loanPct}%)</span><div className="font-mono font-semibold">{fmtUGX(portfolio)}</div></div>
+                        </div>
+
+                        {l.reason && <div className="text-xs text-gray-400 mb-3">Reason: {l.reason}</div>}
+                        <div className="flex items-center gap-2 mb-3 text-xs">
+                          <span className="text-gray-500">Approvals:</span>
+                          {l.approved_by_1 ? (
+                            <span className="px-2 py-0.5 rounded bg-green-900/20 text-green-400 font-semibold">{titleCase(l.approver1?.name) || "Admin 1"}</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-surface-2 text-gray-500">Awaiting 1st</span>
+                          )}
+                          {l.approved_by_1 && <span className="px-2 py-0.5 rounded bg-surface-2 text-gray-500">Awaiting 2nd</span>}
+                        </div>
+
+                        {/* Actions: Approve hidden if current admin already approved, Reject always visible */}
+                        <div className="flex gap-2 items-center">
+                          {l.approved_by_1 === user.id ? (
+                            <div className="flex-1 text-xs text-amber-400 bg-amber-900/10 border border-amber-800/20 rounded-lg px-3 py-2">You approved — awaiting 2nd admin</div>
+                          ) : (
+                            <button onClick={() => handleLoanAction(l.id, "approve")} className={`${btnPrimary} px-4 text-xs`}>{l.approved_by_1 ? "Approve (2nd)" : "Approve (1st)"}</button>
+                          )}
+                          <button onClick={() => setConfirm({ title: "Reject Loan", message: `Reject ${titleCase(l.members?.name)}'s loan request for ${fmtUGX(l.amount)}?`, onConfirm: () => handleLoanAction(l.id, "reject"), confirmText: "Reject", danger: true })} className={`${btnSecondary} px-4 text-xs`}>Reject</button>
                         </div>
                       </div>
-                      {l.reason && <div className="text-xs text-gray-400 mb-3">Reason: {l.reason}</div>}
-                      <div className="flex items-center gap-2 mb-3 text-xs">
-                        <span className="text-gray-500">Approvals:</span>
-                        {l.approved_by_1 ? (
-                          <span className="px-2 py-0.5 rounded bg-green-900/20 text-green-400 font-semibold">{l.approver1?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "Admin 1"}</span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded bg-surface-2 text-gray-500">Awaiting 1st</span>
-                        )}
-                        {l.approved_by_1 ? (
-                          <span className="px-2 py-0.5 rounded bg-surface-2 text-gray-500">Awaiting 2nd</span>
-                        ) : null}
-                      </div>
-                      {l.approved_by_1 === user.id ? (
-                        <div className="text-xs text-amber-400 bg-amber-900/10 border border-amber-800/20 rounded-lg px-3 py-2">You already approved this loan. A different admin must provide the 2nd approval.</div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <button onClick={() => handleLoanAction(l.id, "approve")} className={`${btnPrimary} px-4 text-xs`}>{l.approved_by_1 ? "Approve (2nd)" : "Approve (1st)"}</button>
-                          <button onClick={() => setConfirm({ title: "Reject Loan", message: `Reject ${l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}'s loan request for ${fmtUGX(l.amount)}?`, onConfirm: () => handleLoanAction(l.id, "reject"), confirmText: "Reject", danger: true })} className={`${btnSecondary} px-4 text-xs`}>Reject</button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -474,25 +496,60 @@ export default function AdminPage() {
             {activeLoans.length > 0 && (
               <div className="mb-6">
                 <div className="text-xs font-semibold text-green-400 mb-2">ACTIVE LOANS</div>
-                <div className="card p-0 overflow-hidden"><div className="overflow-x-auto"><div className="min-w-[800px]">
-                  <div className="grid grid-cols-7 items-center px-5 py-2.5 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold">
-                    <span>MEMBER</span><span className="text-right">AMOUNT</span><span className="text-right">TOTAL DUE</span><span className="text-right">PAID</span><span className="text-right">REMAINING</span><span className="text-right">DUE DATE</span><span className="text-right">STATUS</span>
-                  </div>
+                <div className="space-y-3">
                   {activeLoans.map((l) => {
                     const pct = l.calculated_total_due > 0 ? Math.min(100, Math.round((l.amount_paid / l.calculated_total_due) * 100)) : 0;
+                    const isExpanded = expandedLoan === l.id;
                     return (
-                      <div key={l.id} className={`grid grid-cols-7 items-center px-5 py-3 border-b border-surface-3 text-[13px] ${l.is_overdue ? "bg-red-900/5" : ""}`}>
-                        <div className="font-medium">{l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
-                        <div className="text-right font-mono">{fmtShort(l.amount)}</div>
-                        <div className="text-right font-mono">{fmtShort(l.calculated_total_due)}</div>
-                        <div className="text-right font-mono text-green-400">{fmtShort(l.amount_paid)}</div>
-                        <div className={`text-right font-mono ${l.is_overdue ? "text-red-400" : "text-amber-400"}`}>{fmtShort(l.remaining)}</div>
-                        <div className="text-right text-xs">{l.due_date ? fmtDate(l.due_date) : "—"}</div>
-                        <div className="text-right">{l.is_overdue ? <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-900/20 text-red-400">Overdue</span> : <span className="text-[11px] text-gray-500">{pct}% paid</span>}</div>
+                      <div key={l.id} className={`card ${l.is_overdue ? "" : ""}`} style={{ borderColor: l.is_overdue ? "rgba(239,68,68,0.3)" : "rgba(15,118,110,0.2)" }}>
+                        <button onClick={() => setExpandedLoan(isExpanded ? null : l.id)} className="w-full text-left">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="text-sm font-semibold">{titleCase(l.members?.name)}</div>
+                              <div className="text-[11px] text-gray-500">Activated {fmtDate(l.activated_at)} · Due {l.due_date ? fmtDate(l.due_date) : "—"}</div>
+                            </div>
+                            <div className="text-right">
+                              {l.is_overdue && <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-900/20 text-red-400 mb-1 inline-block">Overdue</span>}
+                              <div className="text-sm font-mono font-semibold">{fmtShort(l.remaining)} <span className="text-gray-500 text-xs">remaining</span></div>
+                            </div>
+                          </div>
+                          <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${l.is_overdue ? "bg-red-500" : "bg-brand-500"}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="flex justify-between text-[11px] text-gray-500 mt-1">
+                            <span>Paid: {fmtShort(l.amount_paid)}</span>
+                            <span>{pct}% of {fmtShort(l.calculated_total_due)}</span>
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="mt-3 pt-3 border-t border-surface-3">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
+                              <div><span className="text-gray-500">Principal</span><div className="font-mono font-semibold">{fmtUGX(l.amount)}</div></div>
+                              <div><span className="text-gray-500">Interest ({l.interest_rate}%)</span><div className="font-mono font-semibold">{fmtUGX((l.calculated_total_due || 0) - l.amount)}</div></div>
+                              <div><span className="text-gray-500">Total Due</span><div className="font-mono font-semibold">{fmtUGX(l.calculated_total_due)}</div></div>
+                              <div><span className="text-gray-500">Remaining</span><div className={`font-mono font-semibold ${l.is_overdue ? "text-red-400" : "text-amber-400"}`}>{fmtUGX(l.remaining)}</div></div>
+                            </div>
+                            {l.loan_payments?.length > 0 && (
+                              <div>
+                                <div className="text-xs font-semibold text-gray-500 mb-2">Payments ({l.loan_payments.length})</div>
+                                <div className="space-y-1">
+                                  {l.loan_payments.map((p) => (
+                                    <div key={p.id} className="flex justify-between text-xs">
+                                      <span className="text-gray-500">{fmtDate(p.created_at)}</span>
+                                      <span className="font-mono text-green-400">+{fmtShort(p.amount)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {(!l.loan_payments || l.loan_payments.length === 0) && <div className="text-xs text-gray-500">No payments yet</div>}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
-                </div></div></div>
+                </div>
               </div>
             )}
 
@@ -500,13 +557,25 @@ export default function AdminPage() {
               <div>
                 <div className="text-xs font-semibold text-gray-500 mb-2">HISTORY</div>
                 <div className="card p-0 overflow-hidden">
-                  {pastLoans.slice(0, 20).map((l) => (
-                    <div key={l.id} className="flex items-center justify-between px-5 py-2.5 border-b border-surface-3 text-[13px]">
-                      <div><div className="font-medium">{l.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div><div className="text-[11px] text-gray-500">{fmtDate(l.requested_at)}</div></div>
-                      <div className="font-mono">{fmtShort(l.amount)}</div>
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${l.status === "paid" ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{l.status === "paid" ? "Paid" : "Rejected"}</span>
-                    </div>
-                  ))}
+                  {pastLoans.slice(0, 20).map((l) => {
+                    const totalDue = l.calculated_total_due || l.total_due || l.amount;
+                    const interestEarned = l.status === "paid" ? totalDue - l.amount : 0;
+                    return (
+                      <div key={l.id} className="flex items-center justify-between px-5 py-3 border-b border-surface-3 text-[13px]">
+                        <div className="min-w-0">
+                          <div className="font-medium">{titleCase(l.members?.name)}</div>
+                          <div className="text-[11px] text-gray-500">
+                            {fmtDate(l.requested_at)}{l.status === "paid" && l.paid_at ? ` → ${fmtDate(l.paid_at)}` : l.rejected_at ? ` → ${fmtDate(l.rejected_at)}` : ""}
+                          </div>
+                        </div>
+                        <div className="text-right mx-3">
+                          <div className="font-mono">{fmtShort(l.amount)}</div>
+                          {l.status === "paid" && interestEarned > 0 && <div className="text-[11px] font-mono text-green-400">+{fmtShort(interestEarned)} interest</div>}
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold shrink-0 ${l.status === "paid" ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{l.status === "paid" ? "Paid" : "Rejected"}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
