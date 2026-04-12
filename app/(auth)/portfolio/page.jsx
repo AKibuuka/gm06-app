@@ -73,7 +73,7 @@ export default function PortfolioPage() {
         <div className="card">
           <div className="text-sm font-semibold mb-4">Growth</div>
           {histValues.length > 1 ? <Sparkline data={histValues} width={500} height={120} /> : <div className="text-gray-500 text-sm py-8 text-center">No history yet</div>}
-          <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
             {[
               { label: "Current", value: fmtShort(totalValue), color: "#14B8A6" },
               { label: "All-time High", value: fmtShort(peak), color: "#3B82F6" },
@@ -92,24 +92,24 @@ export default function PortfolioPage() {
             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded" style={{ background: s.color }} /><span className="text-sm font-semibold">{s.label}</span></div>
             <div className="text-sm font-mono font-semibold">{fmtUGX(s.value)}</div>
           </div>
-          <div className="overflow-x-auto"><div className="min-w-[600px]">
-            <div className="grid grid-cols-5 items-center px-5 py-2 text-[11px] text-gray-500 font-semibold border-b border-surface-3">
-              <span>NAME</span><span className="text-right">QTY</span><span className="text-right">COST</span><span className="text-right">VALUE</span><span className="text-right">GAIN</span>
+          <div className="overflow-x-auto">
+            <div className="grid grid-cols-3 sm:grid-cols-5 items-center px-4 sm:px-5 py-2 text-[11px] text-gray-500 font-semibold border-b border-surface-3">
+              <span>NAME</span><span className="hidden sm:block text-right">QTY</span><span className="hidden sm:block text-right">COST</span><span className="text-right">VALUE</span><span className="text-right">GAIN</span>
             </div>
             {s.investments.map((inv) => {
               const gain = (inv.current_value || 0) - (inv.cost_basis || 0);
               const gainPct = inv.cost_basis > 0 ? ((gain / inv.cost_basis) * 100).toFixed(1) : 0;
               return (
-                <div key={inv.id} className="grid grid-cols-5 items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
-                  <div><div className="font-medium">{inv.name}</div>{inv.ticker && <div className="text-[11px] text-gray-500">{inv.ticker}</div>}</div>
-                  <div className="text-right font-mono text-gray-400">{inv.quantity > 1 ? Number(inv.quantity).toLocaleString(undefined, { maximumFractionDigits: 4 }) : "-"}</div>
-                  <div className="text-right font-mono text-gray-400">{fmtShort(inv.cost_basis)}</div>
+                <div key={inv.id} className="grid grid-cols-3 sm:grid-cols-5 items-center px-4 sm:px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
+                  <div><div className="font-medium truncate">{inv.name}</div>{inv.ticker && <div className="text-[11px] text-gray-500">{inv.ticker}</div>}</div>
+                  <div className="hidden sm:block text-right font-mono text-gray-400">{inv.quantity > 1 ? Number(inv.quantity).toLocaleString(undefined, { maximumFractionDigits: 4 }) : "-"}</div>
+                  <div className="hidden sm:block text-right font-mono text-gray-400">{fmtShort(inv.cost_basis)}</div>
                   <div className="text-right font-mono font-semibold">{fmtShort(inv.current_value)}</div>
                   <div className={`text-right font-semibold ${gain >= 0 ? "text-green-400" : "text-red-400"}`}>{gain >= 0 ? "+" : ""}{gainPct}%</div>
                 </div>
               );
             })}
-          </div></div>
+          </div>
         </div>
       ))}
     </div>

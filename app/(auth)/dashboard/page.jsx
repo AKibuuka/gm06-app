@@ -361,7 +361,7 @@ function MemberDashboard({ hideHeader = false }) {
           </div>
 
           {/* Club Daily/Weekly */}
-          <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
             <StatCard label="Club Today" value={club_gains?.daily ? `${club_gains.daily.gain >= 0 ? "+" : ""}${fmtShort(club_gains.daily.gain)}` : "—"} sub={club_gains?.daily ? `${club_gains.daily.pct >= 0 ? "+" : ""}${club_gains.daily.pct}%` : "No price data"} color={!club_gains?.daily ? "#6B7280" : club_gains.daily.gain >= 0 ? "#22C55E" : "#EF4444"} />
             <StatCard label="Club This Week" value={club_gains?.weekly ? `${club_gains.weekly.gain >= 0 ? "+" : ""}${fmtShort(club_gains.weekly.gain)}` : "—"} sub={club_gains?.weekly ? `${club_gains.weekly.pct >= 0 ? "+" : ""}${club_gains.weekly.pct}%` : "No price data"} color={!club_gains?.weekly ? "#6B7280" : club_gains.weekly.gain >= 0 ? "#22C55E" : "#EF4444"} />
             <StatCard label="Club All-Time" value={fmtUGX(clubTotal - (clubHist[0]?.total_invested || 0))} sub="Since inception" color="#14B8A6" />
@@ -516,7 +516,7 @@ function AdminDashboard() {
         <StatCard label="Total Invested" value={fmtUGX(totalInvested)} sub={`${members.length} members`} color="#3B82F6" />
         <StatCard label="Arrears" value={fmtUGX(Math.abs(totalArrears))} sub={`${arrearsMembers.length} members behind`} color="#EF4444" />
       </div>
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
         <StatCard label="Today" value={clubGains.daily ? `${clubGains.daily.gain >= 0 ? "+" : ""}${fmtShort(clubGains.daily.gain)}` : "—"} sub={clubGains.daily ? `${clubGains.daily.pct >= 0 ? "+" : ""}${clubGains.daily.pct}%` : "No price data"} color={!clubGains.daily ? "#6B7280" : clubGains.daily.gain >= 0 ? "#22C55E" : "#EF4444"} />
         <StatCard label="This Week" value={clubGains.weekly ? `${clubGains.weekly.gain >= 0 ? "+" : ""}${fmtShort(clubGains.weekly.gain)}` : "—"} sub={clubGains.weekly ? `${clubGains.weekly.pct >= 0 ? "+" : ""}${clubGains.weekly.pct}%` : "No price data"} color={!clubGains.weekly ? "#6B7280" : clubGains.weekly.gain >= 0 ? "#22C55E" : "#EF4444"} />
         <StatCard label="All-Time Gain" value={fmtUGX(totalGain)} sub="Since inception" color={totalGain >= 0 ? "#14B8A6" : "#EF4444"} />
@@ -540,21 +540,21 @@ function AdminDashboard() {
 
       <div className="card p-0 overflow-hidden">
         <div className="px-5 py-3 border-b border-surface-3 flex justify-between items-center"><span className="text-sm font-semibold">All Members</span><span className="text-xs text-gray-500">{members.length} members</span></div>
-        <div className="overflow-x-auto"><div className="min-w-[600px]">
+        <div className="overflow-x-auto">
           {members.sort((a, b) => (b.snapshot?.portfolio_value || 0) - (a.snapshot?.portfolio_value || 0)).map((m) => {
             const s = m.snapshot;
             const ret = s && s.total_invested > 0 ? (((s.portfolio_value - s.total_invested) / s.total_invested) * 100).toFixed(1) : 0;
             return (
-              <div key={m.id} className="grid grid-cols-5 items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
-                <div className="flex items-center gap-2.5"><Avatar name={m.name} size={30} /><div><div className="font-medium">{titleCase(m.name)}</div><div className="text-[11px] text-gray-500">{m.monthly_contribution > 0 ? `${fmtShort(m.monthly_contribution)}/mo` : "No monthly"}</div></div></div>
-                <div className="text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
+              <div key={m.id} className="grid grid-cols-3 sm:grid-cols-5 items-center px-4 sm:px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
+                <div className="flex items-center gap-2.5"><Avatar name={m.name} size={30} /><div><div className="font-medium truncate">{titleCase(m.name)}</div><div className="text-[11px] text-gray-500 hidden sm:block">{m.monthly_contribution > 0 ? `${fmtShort(m.monthly_contribution)}/mo` : ""}</div></div></div>
                 <div className="text-right font-mono font-semibold">{fmtShort(s?.portfolio_value || 0)}</div>
                 <div className={`text-right font-semibold ${ret >= 0 ? "text-green-400" : "text-red-400"}`}>{ret >= 0 ? "+" : ""}{ret}%</div>
-                <div className="text-right"><span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.advance_contribution || 0) >= 0 ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{(s?.advance_contribution || 0) >= 0 ? "Current" : `−${fmtShort(Math.abs(s.advance_contribution))}`}</span></div>
+                <div className="hidden sm:block text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
+                <div className="hidden sm:block text-right"><span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.advance_contribution || 0) >= 0 ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{(s?.advance_contribution || 0) >= 0 ? "Current" : `−${fmtShort(Math.abs(s.advance_contribution))}`}</span></div>
               </div>
             );
           })}
-        </div></div>
+        </div>
       </div>
 
       {/* Activity Feed */}

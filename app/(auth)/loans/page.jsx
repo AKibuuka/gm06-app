@@ -91,7 +91,7 @@ export default function LoansPage() {
             <Landmark size={18} className="text-brand-500" />
             <span className="text-sm font-semibold">Loan Eligibility</span>
           </div>
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             <div>
               <div className="text-xs text-gray-500">Your Portfolio</div>
               <div className="text-lg font-bold font-mono">{fmtUGX(portfolioValue)}</div>

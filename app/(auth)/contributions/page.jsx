@@ -133,20 +133,20 @@ export default function ContributionsPage() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="card"><div className="text-xs text-gray-500 mb-1">Total Deposits</div><div className="text-lg font-bold font-mono text-green-400">{fmtUGX(totalDeposits)}</div></div>
         <div className="card"><div className="text-xs text-gray-500 mb-1">Total Fines</div><div className="text-lg font-bold font-mono text-amber-400">{fmtUGX(totalFines)}</div></div>
         <div className="card"><div className="text-xs text-gray-500 mb-1">Net Contributions</div><div className="text-lg font-bold font-mono">{fmtUGX(totalDeposits - contributions.filter(c => c.type === "withdrawal").reduce((s,c) => s + c.amount, 0))}</div></div>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-4">
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={`${selectClass} w-40`}>
+      <div className="flex flex-wrap gap-3 mb-4">
+        <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={`${selectClass} w-full sm:w-40`}>
           <option value="">All types</option>
           <option value="deposit">Deposits</option><option value="fine">Fines</option><option value="expense">Expenses</option><option value="withdrawal">Withdrawals</option>
         </select>
         {isAdmin && (
-          <select value={filterMember} onChange={(e) => setFilterMember(e.target.value)} className={`${selectClass} w-56`}>
+          <select value={filterMember} onChange={(e) => setFilterMember(e.target.value)} className={`${selectClass} w-full sm:w-56`}>
             <option value="">All members</option>
             {members.map((m) => <option key={m.id} value={m.id}>{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</option>)}
           </select>
@@ -154,9 +154,9 @@ export default function ContributionsPage() {
       </div>
 
       {/* Table */}
-      <div className="card p-0 overflow-hidden"><div className="overflow-x-auto"><div className={`${isAdmin ? "min-w-[700px]" : "min-w-[550px]"}`}>
-        <div className={`grid ${isAdmin ? "grid-cols-[1fr_1fr_80px_1fr_1fr_1fr_40px]" : "grid-cols-5"} items-center px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide`}>
-          <span>DATE</span>{isAdmin && <span>MEMBER</span>}<span>TYPE</span><span className="text-right">AMOUNT</span><span>BANK REF</span><span>DESCRIPTION</span>{isAdmin && <span></span>}
+      <div className="card p-0 overflow-hidden"><div className="overflow-x-auto">
+        <div className={`grid ${isAdmin ? "grid-cols-4 sm:grid-cols-[1fr_1fr_80px_1fr_1fr_1fr_40px]" : "grid-cols-3 sm:grid-cols-5"} items-center px-4 sm:px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide`}>
+          <span>DATE</span>{isAdmin && <span>MEMBER</span>}<span>TYPE</span><span className="text-right">AMOUNT</span><span className="hidden sm:block">BANK REF</span><span className="hidden sm:block">DESCRIPTION</span>{isAdmin && <span className="hidden sm:block"></span>}
         </div>
         {filtered.length === 0 ? (
           <div className="px-5 py-12 text-center text-gray-500 text-sm">No contributions found</div>
@@ -165,19 +165,19 @@ export default function ContributionsPage() {
             const style = TYPE_STYLES[c.type] || TYPE_STYLES.deposit;
             const Icon = style.icon;
             return (
-              <div key={c.id} className={`grid ${isAdmin ? "grid-cols-[1fr_1fr_80px_1fr_1fr_1fr_40px]" : "grid-cols-5"} items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]`}>
-                <div className="font-mono text-gray-400">{fmtDate(c.date)}</div>
-                {isAdmin && <div className="font-medium">{c.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "—"}</div>}
+              <div key={c.id} className={`grid ${isAdmin ? "grid-cols-4 sm:grid-cols-[1fr_1fr_80px_1fr_1fr_1fr_40px]" : "grid-cols-3 sm:grid-cols-5"} items-center px-4 sm:px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]`}>
+                <div className="font-mono text-gray-400 text-xs">{fmtDate(c.date)}</div>
+                {isAdmin && <div className="font-medium truncate">{c.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "—"}</div>}
                 <div><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${style.bg}`}><Icon size={10} />{c.type}</span></div>
                 <div className="text-right font-mono font-semibold">{fmtUGX(c.amount)}</div>
-                <div className="text-gray-500 text-xs font-mono truncate">{c.bank_ref || "—"}</div>
-                <div className="text-gray-500 text-xs truncate">{c.description || "—"}</div>
-                {isAdmin && <div><button onClick={() => openEdit(c)} className="p-1 rounded hover:bg-surface-3 text-gray-500 hover:text-white"><Pencil size={12} /></button></div>}
+                <div className="hidden sm:block text-gray-500 text-xs font-mono truncate">{c.bank_ref || "—"}</div>
+                <div className="hidden sm:block text-gray-500 text-xs truncate">{c.description || "—"}</div>
+                {isAdmin && <div className="hidden sm:block"><button onClick={() => openEdit(c)} className="p-2 sm:p-1 rounded hover:bg-surface-3 text-gray-500 hover:text-white"><Pencil size={12} /></button></div>}
               </div>
             );
           })
         )}
-      </div></div></div>
+      </div></div>
 
       {/* Add Single Modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Record Contribution">

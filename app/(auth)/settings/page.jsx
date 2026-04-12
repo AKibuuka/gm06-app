@@ -184,7 +184,7 @@ export default function SettingsPage() {
           <div className="bg-amber-900/20 border border-amber-800/30 rounded-lg p-4 mb-4">
             <div className="text-sm font-semibold text-amber-400 mb-2">Save your backup codes</div>
             <p className="text-xs text-gray-400 mb-3">These codes can be used to log in if you lose access to your authenticator app. Each code can only be used once. Save them somewhere safe.</p>
-            <div className="grid grid-cols-2 gap-1.5 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-3">
               {mfaBackupCodes.map((code) => (
                 <div key={code} className="bg-surface-2 rounded px-3 py-1.5 font-mono text-xs text-center">{code}</div>
               ))}

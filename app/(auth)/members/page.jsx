@@ -143,10 +143,10 @@ export default function MembersPage() {
           <h1 className="text-2xl font-bold">Members</h1>
           <p className="text-sm text-gray-500 mt-1">{members.length} active members</p>
         </div>
-        <div className="flex gap-2">
-          <div className="relative">
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 sm:flex-none">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-surface-2 border border-surface-3 rounded-lg text-sm text-white outline-none focus:border-brand-700 w-48" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="pl-9 pr-4 py-2 bg-surface-2 border border-surface-3 rounded-lg text-sm text-white outline-none focus:border-brand-700 w-full sm:w-48" />
           </div>
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-surface-2 border border-surface-3 rounded-lg px-3 py-2 text-sm text-white outline-none cursor-pointer">
             <option value="value">By Value</option>
@@ -156,34 +156,34 @@ export default function MembersPage() {
         </div>
       </div>
 
-      <div className="card p-0 overflow-hidden"><div className="overflow-x-auto"><div className="min-w-[700px]">
-        <div className="grid grid-cols-6 items-center px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide">
-          <span>MEMBER</span><span className="text-right">INVESTED</span><span className="text-right">VALUE</span><span className="text-right">RETURN</span><span className="text-right">STATUS</span><span className="text-center">STATEMENT</span>
+      <div className="card p-0 overflow-hidden"><div className="overflow-x-auto">
+        <div className="grid grid-cols-3 sm:grid-cols-6 items-center px-4 sm:px-5 py-3 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold tracking-wide">
+          <span>MEMBER</span><span className="text-right">VALUE</span><span className="text-right">RETURN</span><span className="hidden sm:block text-right">INVESTED</span><span className="hidden sm:block text-right">STATUS</span><span className="hidden sm:block text-center">STATEMENT</span>
         </div>
         {filtered.map((m) => {
           const s = m.snapshot;
           const ret = s && s.total_invested > 0 ? (((s.portfolio_value - s.total_invested) / s.total_invested) * 100).toFixed(1) : 0;
           return (
-            <div key={m.id} className="grid grid-cols-6 items-center px-5 py-3.5 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
+            <div key={m.id} onClick={() => setSelected(m)} className="grid grid-cols-3 sm:grid-cols-6 items-center px-4 sm:px-5 py-3.5 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px] cursor-pointer">
               <div>
-                <div className="font-medium">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
-                <div className="text-[11px] text-gray-500">{m.monthly_contribution > 0 ? `${fmtShort(m.monthly_contribution)}/mo` : "No monthly"}</div>
+                <div className="font-medium truncate">{m.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
+                <div className="text-[11px] text-gray-500">{m.monthly_contribution > 0 ? `${fmtShort(m.monthly_contribution)}/mo` : ""}</div>
               </div>
-              <div className="text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
               <div className="text-right font-mono font-semibold">{fmtShort(s?.portfolio_value || 0)}</div>
               <div className={`text-right font-semibold ${ret >= 0 ? "text-green-400" : "text-red-400"}`}>{ret >= 0 ? "+" : ""}{ret}%</div>
-              <div className="text-right">
+              <div className="hidden sm:block text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
+              <div className="hidden sm:block text-right">
                 <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.advance_contribution || 0) >= 0 ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>
                   {(s?.advance_contribution || 0) >= 0 ? "Current" : `−${fmtShort(Math.abs(s.advance_contribution))}`}
                 </span>
               </div>
-              <div className="text-center">
-                <button onClick={() => setSelected(m)} className="bg-brand-700 hover:bg-brand-800 text-white text-[11px] px-3 py-1 rounded-md transition-colors">View</button>
+              <div className="hidden sm:block text-center">
+                <button className="bg-brand-700 hover:bg-brand-800 text-white text-[11px] px-3 py-1 rounded-md transition-colors">View</button>
               </div>
             </div>
           );
         })}
-      </div></div></div>
+      </div></div>
     </div>
   );
 }

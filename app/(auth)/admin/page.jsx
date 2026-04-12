@@ -343,16 +343,16 @@ export default function AdminPage() {
             return (
               <div key={cls} className="card p-0 overflow-hidden mb-4">
                 <div className="px-5 py-3 border-b border-surface-3 flex justify-between items-center bg-surface-2"><span className="text-sm font-semibold">{ASSET_CLASS_LABELS[cls]}</span><span className="text-sm font-mono">{fmtUGX(clsInv.reduce((s, i) => s + (i.current_value || 0), 0))}</span></div>
-                <div className="overflow-x-auto"><div className="min-w-[700px]">{clsInv.map((inv) => (
-                  <div key={inv.id} className="grid grid-cols-6 items-center px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
-                    <div><div className="font-medium">{inv.name}</div>{inv.ticker && <div className="text-[11px] text-gray-500">{inv.ticker}</div>}</div>
-                    <div className="text-right font-mono text-gray-400">{Number(inv.quantity).toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
-                    <div className="text-right font-mono text-gray-400">{fmtShort(inv.cost_basis)}</div>
+                <div className="overflow-x-auto">{clsInv.map((inv) => (
+                  <div key={inv.id} className="grid grid-cols-3 sm:grid-cols-6 items-center px-4 sm:px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
+                    <div><div className="font-medium truncate">{inv.name}</div>{inv.ticker && <div className="text-[11px] text-gray-500">{inv.ticker}</div>}</div>
+                    <div className="hidden sm:block text-right font-mono text-gray-400">{Number(inv.quantity).toLocaleString(undefined, { maximumFractionDigits: 4 })}</div>
+                    <div className="hidden sm:block text-right font-mono text-gray-400">{fmtShort(inv.cost_basis)}</div>
                     <div className="text-right font-mono font-semibold">{fmtShort(inv.current_value)}</div>
-                    <div className="text-right text-[11px] text-gray-500">{inv.price_source}</div>
-                    <div className="text-right"><button onClick={() => { setEditItem(inv); setInvForm({ name: inv.name, ticker: inv.ticker || "", asset_class: inv.asset_class, quantity: inv.quantity, cost_basis: inv.cost_basis, current_price: inv.current_price, current_value: inv.current_value, price_source: inv.price_source, notes: inv.notes || "" }); setShowInvestmentForm(true); }} className="p-1.5 rounded hover:bg-surface-3 text-gray-400 hover:text-white"><Pencil size={14} /></button></div>
+                    <div className="hidden sm:block text-right text-[11px] text-gray-500">{inv.price_source}</div>
+                    <div className="text-right"><button onClick={() => { setEditItem(inv); setInvForm({ name: inv.name, ticker: inv.ticker || "", asset_class: inv.asset_class, quantity: inv.quantity, cost_basis: inv.cost_basis, current_price: inv.current_price, current_value: inv.current_value, price_source: inv.price_source, notes: inv.notes || "" }); setShowInvestmentForm(true); }} className="p-2 sm:p-1.5 rounded hover:bg-surface-3 text-gray-400 hover:text-white"><Pencil size={14} /></button></div>
                   </div>
-                ))}</div></div>
+                ))}</div>
               </div>
             );
           })}
@@ -384,15 +384,15 @@ export default function AdminPage() {
           </div>
           <div className="card p-0 overflow-hidden">
             {fines.length === 0 ? <div className="px-5 py-8 text-center text-gray-500 text-sm">No fines recorded</div> : (
-              <div className="overflow-x-auto"><div className="min-w-[600px]">{fines.map((f) => (
-                <div key={f.id} className="grid grid-cols-5 items-center px-5 py-3 border-b border-surface-3 text-[13px] hover:bg-surface-2 transition-colors">
-                  <div className="font-mono text-gray-400">{fmtDate(f.date)}</div>
-                  <div>{f.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "—"}</div>
-                  <div className="text-gray-400 text-xs truncate">{f.reason}</div>
+              <div className="overflow-x-auto">{fines.map((f) => (
+                <div key={f.id} className="grid grid-cols-3 sm:grid-cols-5 items-center px-4 sm:px-5 py-3 border-b border-surface-3 text-[13px] hover:bg-surface-2 transition-colors">
+                  <div><div className="font-medium truncate">{titleCase(f.members?.name) || "—"}</div><div className="text-[11px] text-gray-500 sm:hidden">{fmtDate(f.date)}</div></div>
+                  <div className="hidden sm:block font-mono text-gray-400">{fmtDate(f.date)}</div>
+                  <div className="hidden sm:block text-gray-400 text-xs truncate">{f.reason}</div>
                   <div className="text-right font-mono font-semibold text-amber-400">{fmtUGX(f.amount)}</div>
-                  <div className="text-right"><button onClick={() => toggleFinePaid(f)} className={`px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${f.is_paid ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{f.is_paid ? "Paid" : "Unpaid"}</button></div>
+                  <div className="text-right"><button onClick={() => toggleFinePaid(f)} className={`px-2 py-1 sm:py-0.5 rounded text-[11px] font-semibold cursor-pointer ${f.is_paid ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{f.is_paid ? "Paid" : "Unpaid"}</button></div>
                 </div>
-              ))}</div></div>
+              ))}</div>
             )}
           </div>
           <Modal open={showFineForm} onClose={() => setShowFineForm(false)} title="Record Fine">
@@ -723,20 +723,20 @@ export default function AdminPage() {
             {filtered.length === 0 ? (
               <div className="card text-center py-8 text-gray-500 text-sm">No audit log entries yet</div>
             ) : (
-              <div className="card p-0 overflow-hidden"><div className="overflow-x-auto"><div className="min-w-[700px]">
-                <div className="grid grid-cols-[140px_120px_90px_80px_1fr] items-center px-5 py-2.5 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold">
-                  <span>DATE</span><span>ADMIN</span><span>ACTION</span><span>TYPE</span><span>DETAILS</span>
+              <div className="card p-0 overflow-hidden"><div className="overflow-x-auto">
+                <div className="grid grid-cols-3 sm:grid-cols-[140px_120px_90px_80px_1fr] items-center px-4 sm:px-5 py-2.5 border-b-2 border-brand-700 text-[11px] text-gray-500 font-semibold">
+                  <span>DATE</span><span className="hidden sm:block">ADMIN</span><span>ACTION</span><span>TYPE</span><span className="hidden sm:block">DETAILS</span>
                 </div>
                 {filtered.slice(0, 200).map((log) => (
-                  <div key={log.id} className="grid grid-cols-[140px_120px_90px_80px_1fr] items-center px-5 py-2.5 border-b border-surface-3 text-[13px]">
+                  <div key={log.id} className="grid grid-cols-3 sm:grid-cols-[140px_120px_90px_80px_1fr] items-center px-4 sm:px-5 py-2.5 border-b border-surface-3 text-[13px]">
                     <div className="font-mono text-gray-500 text-xs">{new Date(log.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
-                    <div className="text-sm truncate">{log.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "—"}</div>
+                    <div className="hidden sm:block text-sm truncate">{titleCase(log.members?.name) || "—"}</div>
                     <div className="text-xs font-semibold">{ACTION_LABELS[log.action] || log.action}</div>
                     <div><span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${ENTITY_STYLES[log.entity_type] || "bg-surface-2 text-gray-400"}`}>{log.entity_type}</span></div>
-                    <div className="text-xs text-gray-400 truncate">{formatDetails(log)}</div>
+                    <div className="hidden sm:block text-xs text-gray-400 truncate">{formatDetails(log)}</div>
                   </div>
                 ))}
-              </div></div></div>
+              </div></div>
             )}
           </div>
         );

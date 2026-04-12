@@ -285,7 +285,7 @@ export default function MessagesPage() {
         </button>
       </div>
 
-      <div className="card p-0 overflow-hidden" style={{ height: "calc(100vh - 280px)", minHeight: 400 }}>
+      <div className="card p-0 overflow-hidden" style={{ height: "calc(100dvh - 220px)", minHeight: 350 }}>
         {tab === "group" && <GroupChat user={user} />}
         {tab === "dm" && <DirectMessages user={user} />}
       </div>
