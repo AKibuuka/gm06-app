@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [loans, setLoans] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [auditFilter, setAuditFilter] = useState("");
   const [snapshots, setSnapshots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -602,7 +603,6 @@ export default function AdminPage() {
           setting: "bg-gray-800/40 text-gray-400",
           withdrawal: "bg-cyan-900/20 text-cyan-400",
         };
-        const [auditFilter, setAuditFilter] = useState("");
         const filtered = auditFilter ? auditLogs.filter((l) => l.entity_type === auditFilter) : auditLogs;
 
         function formatDetails(log) {
