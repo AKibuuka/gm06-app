@@ -76,13 +76,14 @@ export default function ContributionsPage() {
     e.preventDefault(); setSubmitting(true);
     const entries = Object.entries(batchAmounts).filter(([, a]) => a > 0);
     const results = [];
+    let failures = 0;
     for (const [member_id, amount] of entries) {
       const res = await fetch("/api/contributions", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ member_id, amount, type: "deposit", description: `Monthly contribution`, bank_ref: batchRefs[member_id] || null, date: batchDate }),
       });
       if (res.ok) results.push(await res.json());
-      else { const err = await res.json(); toast?.(`${err.error}`, "error"); }
+      else { failures++; const err = await res.json(); toast?.(`${err.error}`, "error"); }
     }
     setContributions([...results, ...contributions]);
     setShowBatch(false); setBatchAmounts({}); setBatchRefs({}); setSubmitting(false);
@@ -91,9 +92,10 @@ export default function ContributionsPage() {
     const totalRecorded = results.reduce((s, r) => s + (r.amount || 0), 0);
     const loanDeductions = results.filter((r) => r.loan_deduction);
     const loanTotal = loanDeductions.reduce((s, r) => s + (r.loan_deduction?.amount_applied || 0), 0);
-    let msg = `Recorded ${results.length} contributions totaling ${fmtUGX(totalRecorded + loanTotal)}`;
+    let msg = `Recorded ${results.length}/${entries.length} contributions totaling ${fmtUGX(totalRecorded + loanTotal)}`;
+    if (failures > 0) msg += ` (${failures} failed)`;
     if (loanDeductions.length > 0) msg += `. ${loanDeductions.length} had loan deductions (${fmtUGX(loanTotal)} applied to loans)`;
-    toast?.(msg, "success");
+    toast?.(msg, failures > 0 ? "error" : "success");
   }
 
   async function handleEdit(e) {

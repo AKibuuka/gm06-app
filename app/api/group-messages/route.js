@@ -28,6 +28,7 @@ export async function POST(request) {
 
   const { body } = await request.json();
   if (!body?.trim()) return NextResponse.json({ error: "Message cannot be empty" }, { status: 400 });
+  if (body.trim().length > 5000) return NextResponse.json({ error: "Message too long (max 5000 characters)" }, { status: 400 });
 
   const db = getServiceClient();
   const { data, error } = await db.from("group_messages").insert({

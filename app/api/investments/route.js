@@ -41,8 +41,15 @@ export async function PUT(request) {
   if (!session || !isAdmin(session)) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
 
   const body = await request.json();
-  const { id, ...updates } = body;
+  const { id } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+  // Whitelist allowed fields
+  const ALLOWED = ["name", "ticker", "asset_class", "quantity", "cost_basis", "current_price", "current_value", "price_source", "is_active", "notes"];
+  const updates = {};
+  for (const key of ALLOWED) {
+    if (body[key] !== undefined) updates[key] = body[key];
+  }
 
   const db = getServiceClient();
 

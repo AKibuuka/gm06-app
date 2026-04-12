@@ -96,14 +96,10 @@ export async function PUT(request) {
       return NextResponse.json({ error: "Invalid choice" }, { status: 400 });
     }
 
-    // Check if already voted (for single-choice ballots)
+    // For single-choice: remove any previous vote atomically, then insert new one
+    // For multi-choice: just insert (unique constraint prevents duplicate option)
     if (!ballot.allow_multiple) {
-      const { data: existing } = await db.from("ballot_votes")
-        .select("id").eq("ballot_id", id).eq("member_id", session.id).limit(1);
-      if (existing?.length > 0) {
-        // Update existing vote
-        await db.from("ballot_votes").delete().eq("ballot_id", id).eq("member_id", session.id);
-      }
+      await db.from("ballot_votes").delete().eq("ballot_id", id).eq("member_id", session.id);
     }
 
     const { error } = await db.from("ballot_votes").insert({

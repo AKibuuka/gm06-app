@@ -36,9 +36,16 @@ export async function PUT(request) {
 
   // Validate numeric settings
   const NUMERIC_KEYS = ["ugx_rate", "monthly_target", "required_contribution", "max_loan_pct", "loan_interest_rate"];
+  const MUST_BE_POSITIVE = ["ugx_rate", "max_loan_pct"]; // These cannot be 0
   for (const key of NUMERIC_KEYS) {
-    if (updates[key] !== undefined && (isNaN(parseFloat(updates[key])) || parseFloat(updates[key]) < 0)) {
-      return NextResponse.json({ error: `${key} must be a valid positive number` }, { status: 400 });
+    if (updates[key] !== undefined) {
+      const val = parseFloat(updates[key]);
+      if (isNaN(val) || val < 0) {
+        return NextResponse.json({ error: `${key} must be a valid non-negative number` }, { status: 400 });
+      }
+      if (MUST_BE_POSITIVE.includes(key) && val <= 0) {
+        return NextResponse.json({ error: `${key} must be greater than 0` }, { status: 400 });
+      }
     }
   }
 

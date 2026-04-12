@@ -95,16 +95,21 @@ export async function POST(request) {
       const depositAmount = parseFloat(amount);
       const overdue = isOverdue(activeLoan);
 
+      // Use integer math (cents) to avoid float precision issues
+      const remainingCents = Math.round(remaining * 100);
+      const depositCents = Math.round(depositAmount * 100);
+
       // Loan payment: min of deposit and remaining balance
-      const loanPayment = Math.min(depositAmount, remaining);
+      const loanPaymentCents = Math.min(depositCents, remainingCents);
+      const loanPayment = loanPaymentCents / 100;
       // If overdue: no excess goes to portfolio (all to loan). If current: excess is a normal contribution.
-      const excess = overdue ? 0 : Math.max(0, Math.round((depositAmount - loanPayment) * 100) / 100);
+      const excess = overdue ? 0 : Math.max(0, (depositCents - loanPaymentCents) / 100);
 
       // Record loan payment
       const { error: paymentError } = await db.from("loan_payments").insert({
         loan_id: activeLoan.id,
         member_id,
-        amount: Math.min(loanPayment, remaining),
+        amount: loanPayment,
         source: "contribution",
         contribution_id: data.id,
         note: overdue ? `Overdue loan recovery from deposit of ${depositAmount}` : `Auto-deducted from deposit of ${depositAmount}`,
@@ -112,8 +117,10 @@ export async function POST(request) {
       if (paymentError) return NextResponse.json({ error: "Failed to record loan payment" }, { status: 500 });
 
       // Update loan
-      const newAmountPaid = Math.round((activeLoan.amount_paid + loanPayment) * 100) / 100;
-      const loanPaid = newAmountPaid >= currentDue - 0.01; // epsilon for float precision
+      const newAmountPaidCents = Math.round(activeLoan.amount_paid * 100) + loanPaymentCents;
+      const newAmountPaid = newAmountPaidCents / 100;
+      const currentDueCents = Math.round(currentDue * 100);
+      const loanPaid = newAmountPaidCents >= currentDueCents;
 
       await db.from("loans").update({
         amount_paid: newAmountPaid,

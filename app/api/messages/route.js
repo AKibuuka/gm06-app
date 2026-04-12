@@ -79,6 +79,7 @@ export async function POST(request) {
 
   const { recipient_id, body } = await request.json();
   if (!recipient_id || !body?.trim()) return NextResponse.json({ error: "Recipient and message are required" }, { status: 400 });
+  if (body.trim().length > 5000) return NextResponse.json({ error: "Message too long (max 5000 characters)" }, { status: 400 });
   if (recipient_id === session.id) return NextResponse.json({ error: "Cannot message yourself" }, { status: 400 });
 
   const db = getServiceClient();

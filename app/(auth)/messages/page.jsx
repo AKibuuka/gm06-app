@@ -4,14 +4,10 @@ import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { MessageSquare, Send, ArrowLeft, Plus, Users, User } from "lucide-react";
 import Modal, { FormField, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, titleCase } from "@/lib/format";
 import useTitle from "@/lib/useTitle";
 import { SkeletonPage } from "@/components/Skeleton";
 import Avatar from "@/components/Avatar";
-
-function titleCase(name) {
-  return name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "";
-}
 
 function GroupChat({ user }) {
   const toast = useToast();
@@ -32,13 +28,13 @@ function GroupChat({ user }) {
     if (!loading) setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   }, [messages.length, loading]);
 
-  // Poll for new messages every 10s
+  // Poll for new messages every 30s
   useEffect(() => {
     const interval = setInterval(() => {
       fetch("/api/group-messages")
         .then((r) => r.json())
         .then((d) => { if (Array.isArray(d)) setMessages(d); });
-    }, 10000);
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 

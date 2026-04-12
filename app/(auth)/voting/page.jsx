@@ -5,13 +5,9 @@ import { useToast } from "@/components/Toast";
 import { Vote, Plus, CheckCircle2, Clock, Archive, X, ChevronDown, ChevronUp } from "lucide-react";
 import Modal, { FormField, inputClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import Confirm from "@/components/Confirm";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, titleCase } from "@/lib/format";
 import useTitle from "@/lib/useTitle";
 import { SkeletonPage } from "@/components/Skeleton";
-
-function titleCase(name) {
-  return name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ") || "";
-}
 
 export default function VotingPage() {
   const user = useUser();

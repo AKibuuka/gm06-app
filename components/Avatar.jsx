@@ -37,6 +37,5 @@ export default function Avatar({ name, size = 32 }) {
   );
 }
 
-export function titleCase(name) {
-  return (name || "").split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ");
-}
+// Re-export from canonical location for backward compatibility
+export { titleCase } from "@/lib/format";
