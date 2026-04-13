@@ -86,6 +86,7 @@ create table member_snapshots (
   total_invested numeric(15,2) not null,
   portfolio_value numeric(15,2) not null,
   advance_contribution numeric(15,2) default 0,
+  contribution_arrears numeric(15,2) default 0,
   created_at timestamptz default now(),
   unique(member_id, date)
 );

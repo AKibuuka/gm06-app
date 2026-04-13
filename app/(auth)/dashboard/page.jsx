@@ -425,21 +425,15 @@ function AdminDashboard() {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [contributions, setContributions] = useState([]);
-
   useEffect(() => {
-    const now = new Date();
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     Promise.all([
       fetch("/api/members").then((r) => r.json()),
       fetch("/api/portfolio").then((r) => r.json()),
       fetch("/api/activity").then((r) => r.json()),
-      fetch(`/api/contributions?type=deposit&from=${monthStart}`).then((r) => r.json()),
-    ]).then(([m, p, a, c]) => {
+    ]).then(([m, p, a]) => {
       setMembers(Array.isArray(m) ? m : []);
       setPortfolio(p);
       setActivity(Array.isArray(a) ? a : []);
-      setContributions(Array.isArray(c) ? c : []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -482,21 +476,21 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* Members who haven't contributed this month */}
+      {/* Members behind on contributions */}
       {(() => {
-        const paidMemberIds = new Set(contributions.map((c) => c.member_id));
-        const unpaid = members.filter((m) => !paidMemberIds.has(m.id));
-        if (unpaid.length === 0) return null;
+        const behind = members.filter((m) => (m.snapshot?.contribution_arrears || 0) > 0)
+          .sort((a, b) => b.snapshot.contribution_arrears - a.snapshot.contribution_arrears);
+        if (behind.length === 0) return null;
         return (
           <div className="card mb-5 p-0 overflow-hidden" style={{ borderColor: "rgba(239,68,68,0.2)" }}>
             <div className="px-4 py-3 border-b border-surface-3 flex justify-between items-center">
-              <div className="text-sm font-semibold text-red-400">{unpaid.length} member{unpaid.length > 1 ? "s" : ""} not yet contributed this month</div>
+              <div className="text-sm font-semibold text-red-400">{behind.length} member{behind.length > 1 ? "s" : ""} behind on contributions</div>
               <a href="/contributions" className="text-xs text-brand-500 hover:text-brand-400">Record Now</a>
             </div>
             <div className="flex flex-wrap gap-2 px-4 py-3">
-              {unpaid.map((m) => (
+              {behind.map((m) => (
                 <span key={m.id} className="px-2.5 py-1 rounded-lg bg-red-900/10 border border-red-800/20 text-xs text-red-400">
-                  {titleCase(m.name)}
+                  {titleCase(m.name)} — {fmtUGX(m.snapshot.contribution_arrears)}
                 </span>
               ))}
             </div>
