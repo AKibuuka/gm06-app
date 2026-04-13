@@ -174,6 +174,21 @@ export async function PUT(request) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+    // Create a loans-class investment to track this as a club asset
+    const { data: borrower } = await db.from("members").select("name").eq("id", loan.member_id).single();
+    await db.from("investments").insert({
+      name: `Loan — ${borrower?.name || "Member"}`,
+      asset_class: "loans",
+      quantity: 1,
+      cost_basis: loan.amount,
+      current_price: totalDue,
+      current_value: totalDue,
+      price_source: "manual",
+      is_active: true,
+      notes: `Loan ID: ${id}`,
+    });
+
     await logAudit(session.id, "activate", "loan", id, { member_id: loan.member_id, amount: loan.amount, total_due: totalDue });
     return NextResponse.json({ ...data, message: "Loan activated (2/2 approvals)" });
   }

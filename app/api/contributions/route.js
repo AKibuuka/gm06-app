@@ -128,6 +128,21 @@ export async function POST(request) {
         ...(loanPaid ? { status: "paid", paid_at: new Date().toISOString() } : {}),
       }).eq("id", activeLoan.id);
 
+      // Update the corresponding loans investment: reduce value by payment, deactivate if fully paid
+      const { data: loanInvestment } = await db.from("investments")
+        .select("id, current_value")
+        .eq("asset_class", "loans")
+        .like("notes", `%${activeLoan.id}%`)
+        .maybeSingle();
+      if (loanInvestment) {
+        const newValue = Math.max(0, loanInvestment.current_value - loanPayment);
+        await db.from("investments").update({
+          current_value: newValue,
+          current_price: newValue,
+          ...(loanPaid ? { is_active: false } : {}),
+        }).eq("id", loanInvestment.id);
+      }
+
       // Adjust contribution: only the excess counts as a real contribution
       if (excess > 0) {
         await db.from("contributions").update({
