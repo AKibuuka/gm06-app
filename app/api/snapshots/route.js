@@ -38,8 +38,8 @@ export async function POST(request) {
     totalPortfolioValue += inv.current_value || 0;
   }
 
-  // 2. Get all active members and settings
-  const { data: members } = await db.from("members").select("id, name, monthly_contribution, joined_at").eq("is_active", true);
+  // 2. Get all active members
+  const { data: members } = await db.from("members").select("id, name, monthly_contribution").eq("is_active", true);
   if (!members?.length) return NextResponse.json({ error: "No active members" }, { status: 400 });
 
   // 3. Fetch ALL contributions up to the date in a single query (avoids N+1)
@@ -71,15 +71,35 @@ export async function POST(request) {
   const { data: reqSetting } = await db.from("settings").select("value").eq("key", "required_contribution").single();
   const requiredAmount = parseFloat(reqSetting?.value) || 0;
 
-  // Calculate months from earliest joined_at to snapshot date (all members share same start)
-  const earliestJoin = members.reduce((earliest, m) => {
-    return !earliest || m.joined_at < earliest ? m.joined_at : earliest;
-  }, null);
-  const snapshotDate = new Date(date);
-  const joinDate = new Date(earliestJoin);
-  const totalMonths = (snapshotDate.getFullYear() - joinDate.getFullYear()) * 12
-    + (snapshotDate.getMonth() - joinDate.getMonth()) + 1;
-  const totalExpected = requiredAmount * Math.max(totalMonths, 0);
+  // 4c. Get previous snapshot arrears and deposits to calculate incremental arrears
+  // Find the most recent snapshot date before this one
+  const { data: prevSnap } = await db
+    .from("member_snapshots")
+    .select("member_id, contribution_arrears, date")
+    .lt("date", date)
+    .order("date", { ascending: false })
+    .limit(members.length);
+
+  const prevArrearsMap = {};
+  let prevDate = null;
+  for (const ps of (prevSnap || [])) {
+    prevArrearsMap[ps.member_id] = ps.contribution_arrears || 0;
+    if (!prevDate) prevDate = ps.date;
+  }
+
+  // Deposits since previous snapshot (only count new deposits toward arrears reduction)
+  let depositsSincePrev = {};
+  if (prevDate) {
+    const { data: newDeposits } = await db
+      .from("contributions")
+      .select("member_id, amount")
+      .eq("type", "deposit")
+      .gt("date", prevDate)
+      .lte("date", date);
+    for (const d of (newDeposits || [])) {
+      depositsSincePrev[d.member_id] = (depositsSincePrev[d.member_id] || 0) + d.amount;
+    }
+  }
 
   // 5. Calculate each member's share of portfolio
   const memberSnapshots = [];
@@ -92,8 +112,10 @@ export async function POST(request) {
     const avgContribution = totalClubContributions / members.length;
     const advance = mc.netContribution - avgContribution;
 
-    // Arrears: how much this member is behind on required contributions
-    const arrears = Math.max(0, totalExpected - mc.totalInvested);
+    // Arrears: previous arrears + this month's required - deposits since last snapshot
+    const prevArrears = prevArrearsMap[m.id] || 0;
+    const depositsSince = depositsSincePrev[m.id] || 0;
+    const arrears = Math.max(0, prevArrears + requiredAmount - depositsSince);
 
     memberSnapshots.push({
       member_id: m.id,
