@@ -117,11 +117,13 @@ export async function POST(request) {
   }).select("id, name, email, phone, role, monthly_contribution, is_active, joined_at").single();
 
   if (error) {
-    if (error.code === "23505") return NextResponse.json({ error: "A member with this email already exists" }, { status: 400 });
+    if (error.code === "23505") return NextResponse.json({ error: "Could not create member. The email may already be in use." }, { status: 400 });
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
   await logAudit(session.id, "create", "member", data.id, { name: data.name, email: data.email, role: data.role });
+  // Default password is returned once so the admin can share it with the member.
+  // It is never stored in plaintext — only the bcrypt hash is persisted.
   return NextResponse.json({ ...data, default_password: defaultPwd });
 }
 

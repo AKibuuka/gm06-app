@@ -14,8 +14,8 @@ export async function PUT(request) {
   const { current_password, new_password, member_id } = await request.json();
   const db = getServiceClient();
 
-  if (!new_password || new_password.length < 6) {
-    return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+  if (!new_password || new_password.length < 8) {
+    return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
   }
 
   // Admin resetting another member's password

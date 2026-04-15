@@ -15,6 +15,15 @@ export async function GET(request) {
   const memberId = searchParams.get("member_id");
   let date = searchParams.get("date");
 
+  if (!memberId) {
+    return NextResponse.json({ error: "member_id is required" }, { status: 400 });
+  }
+
+  // Members can only get their own statement
+  if (!isAdmin(session) && memberId !== session.id) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   // If no date provided, use the latest snapshot date
   if (!date) {
     const db0 = getServiceClient();
@@ -26,11 +35,6 @@ export async function GET(request) {
       .limit(1)
       .single();
     date = latestSnap?.date || new Date().toISOString().split("T")[0];
-  }
-
-  // Members can only get their own statement
-  if (!isAdmin(session) && memberId !== session.id) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const db = getServiceClient();
