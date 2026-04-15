@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { useRouter } from "next/navigation";
-import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark, Megaphone, Trash2, ScrollText } from "lucide-react";
+import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark, Megaphone, Trash2, ScrollText, Mail } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import Confirm from "@/components/Confirm";
 import { fmtUGX, fmtShort, fmtDate, titleCase, ASSET_CLASS_LABELS } from "@/lib/format";
@@ -61,6 +61,8 @@ export default function AdminPage() {
   const [valDate, setValDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; });
   const [valResult, setValResult] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [sendingStatements, setSendingStatements] = useState(false);
+  const [statementResult, setStatementResult] = useState(null);
 
   useEffect(() => {
     if (user?.role !== "admin") return;
@@ -130,6 +132,19 @@ export default function AdminPage() {
       await refreshData();
     } catch (e) { setValResult({ error: e.message }); toast?.(e.message, "error"); }
     setGenerating(false);
+  }
+
+  async function sendStatements() {
+    setSendingStatements(true);
+    setStatementResult(null);
+    try {
+      const res = await fetch("/api/send-statements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: valDate }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setStatementResult(data);
+      toast?.(`Statements sent: ${data.sent} delivered, ${data.skipped} skipped, ${data.failed} failed`, data.failed > 0 ? "error" : "success");
+    } catch (e) { setStatementResult({ error: e.message }); toast?.(e.message, "error"); }
+    setSendingStatements(false);
   }
 
   // ── Members ──
@@ -254,6 +269,19 @@ export default function AdminPage() {
                 {valResult.ok ? <>Generated for <strong>{valResult.date}</strong> — {fmtUGX(valResult.totalPortfolioValue)} across {valResult.membersProcessed} members</> : valResult.error}
               </div>
             )}
+            <div className="mt-4 pt-4 border-t border-surface-3">
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+                <div><div className="text-sm font-semibold">Email Statements</div><div className="text-xs text-gray-500">Send PDF statements to all members for the selected date</div></div>
+                <button onClick={sendStatements} disabled={sendingStatements} className={`${btnSecondary} px-5 h-[42px] flex items-center justify-center gap-2`}>
+                  <Mail size={16} />{sendingStatements ? "Sending..." : "Send Statements"}
+                </button>
+              </div>
+              {statementResult && (
+                <div className={`mt-3 p-3 rounded-lg text-sm ${statementResult.error ? "bg-red-900/20 border border-red-800/30 text-red-400" : "bg-green-900/20 border border-green-800/30 text-green-400"}`}>
+                  {statementResult.error ? statementResult.error : <>Sent: {statementResult.sent} | Skipped: {statementResult.skipped} | Failed: {statementResult.failed}{statementResult.errors?.length > 0 && <div className="mt-1 text-xs text-red-400">{statementResult.errors.map((e, i) => <div key={i}>{e.member}: {e.error}</div>)}</div>}</>}
+                </div>
+              )}
+            </div>
           </div>
           <div className="card">
             <h3 className="text-sm font-semibold mb-3">History</h3>
