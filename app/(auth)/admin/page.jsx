@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { useRouter } from "next/navigation";
-import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark, Megaphone, Trash2, ScrollText, Mail } from "lucide-react";
+import { Users, PieChart, Calculator, AlertTriangle, Plus, Pencil, Key, Copy, Landmark, Megaphone, Trash2, ScrollText, Mail, MessageSquare } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import Confirm from "@/components/Confirm";
 import { fmtUGX, fmtShort, fmtDate, titleCase, ASSET_CLASS_LABELS } from "@/lib/format";
@@ -17,9 +17,78 @@ const TABS = [
   { id: "fines", label: "Fines", icon: AlertTriangle },
   { id: "loans", label: "Loans", icon: Landmark },
   { id: "announcements", label: "Announce", icon: Megaphone },
+  { id: "reminders", label: "Reminders", icon: MessageSquare },
   { id: "audit", label: "Audit Log", icon: ScrollText },
 ];
 const ASSET_CLASSES = ["fixed_income", "stocks", "digital_assets", "real_estate", "private_equity", "loans", "cash"];
+
+function RemindersPanel({ toast }) {
+  const [members, setMembers] = useState([]);
+  const [selected, setSelected] = useState({});
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/reminders").then((r) => r.json()).then((d) => { setMembers(Array.isArray(d) ? d : []); setLoading(false); });
+  }, []);
+
+  function toggleAll() {
+    if (Object.keys(selected).length === members.length) setSelected({});
+    else { const s = {}; members.forEach((m) => { s[m.id] = true; }); setSelected(s); }
+  }
+
+  async function send() {
+    const ids = Object.keys(selected).filter((k) => selected[k]);
+    if (!ids.length) { toast?.("Select at least one member", "error"); return; }
+    setSending(true); setResult(null);
+    const res = await fetch("/api/reminders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ member_ids: ids }) });
+    const data = await res.json();
+    if (res.ok) { setResult(data); toast?.(`Sent ${data.sent} reminder${data.sent !== 1 ? "s" : ""}`, data.failed > 0 ? "error" : "success"); }
+    else toast?.(data.error, "error");
+    setSending(false);
+  }
+
+  if (loading) return <div className="card py-12 text-center text-gray-500 text-sm">Loading...</div>;
+  if (members.length === 0) return <div className="card py-12 text-center text-gray-500 text-sm">All members are current on contributions</div>;
+
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="card">
+        <div className="flex justify-between items-center mb-4">
+          <div><h3 className="text-sm font-semibold">{members.length} member{members.length !== 1 ? "s" : ""} in arrears</h3><p className="text-xs text-gray-500">Select members to send SMS reminders</p></div>
+          <div className="flex gap-2">
+            <button onClick={toggleAll} className={`${btnSecondary} px-3 text-xs`}>{selectedCount === members.length ? "Deselect All" : "Select All"}</button>
+            <button onClick={send} disabled={sending || !selectedCount} className={`${btnPrimary} px-4 text-xs flex items-center gap-1.5`}><MessageSquare size={13} />{sending ? "Sending..." : `Send (${selectedCount})`}</button>
+          </div>
+        </div>
+        <div className="space-y-1">
+          {members.map((m) => (
+            <label key={m.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${selected[m.id] ? "bg-surface-2" : "hover:bg-surface-2/50"}`}>
+              <input type="checkbox" checked={!!selected[m.id]} onChange={() => setSelected({ ...selected, [m.id]: !selected[m.id] })} className="accent-brand-700" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">{titleCase(m.name)}</div>
+                <div className="text-[11px] text-gray-500">
+                  {m.phone || "No phone"}{m.last_deposit ? ` · Last deposit: ${fmtDate(m.last_deposit)}` : ""}
+                  {m.last_reminder && <span className="text-amber-500"> · Reminded {new Date(m.last_reminder).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</span>}
+                </div>
+              </div>
+              <span className="text-red-400 font-mono font-semibold text-sm">{fmtUGX(m.arrears)}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      {result && (
+        <div className={`card text-sm ${result.failed > 0 ? "border-red-800/30" : "border-green-800/30"}`}>
+          Sent: {result.sent} | Failed: {result.failed}
+          {result.errors?.length > 0 && <div className="mt-2 text-xs text-red-400">{result.errors.map((e, i) => <div key={i}>{e.member}: {e.error}</div>)}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const user = useUser();
@@ -684,6 +753,9 @@ export default function AdminPage() {
           </div>
         );
       })()}
+
+      {/* ═══ REMINDERS ═══ */}
+      {tab === "reminders" && <RemindersPanel toast={toast} />}
 
       {/* ═══ AUDIT LOG ═══ */}
       {tab === "audit" && (() => {
