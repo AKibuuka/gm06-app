@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
-import { Plus, DollarSign, ArrowDown, ArrowUp, AlertTriangle, Pencil, Paperclip, X } from "lucide-react";
+import { Plus, DollarSign, ArrowDown, ArrowUp, AlertTriangle, Pencil, Paperclip, X, Check, Clock, Send } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import { fmtUGX, fmtShort, fmtDate } from "@/lib/format";
 import useTitle from "@/lib/useTitle";
@@ -38,12 +38,23 @@ export default function ContributionsPage() {
   const [receiptFile, setReceiptFile] = useState(null);
   const [editReceiptFile, setEditReceiptFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  // Deposit submissions (self-service)
+  const [submissions, setSubmissions] = useState([]);
+  const [showSubmit, setShowSubmit] = useState(false);
+  const [submitForm, setSubmitForm] = useState({ amount: "", date: new Date().toISOString().split("T")[0], bank_ref: "", notes: "" });
+  const [submitReceipt, setSubmitReceipt] = useState(null);
+  const [rejectId, setRejectId] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   useEffect(() => {
-    const fetches = [fetch("/api/contributions").then((r) => r.json())];
+    const fetches = [
+      fetch("/api/contributions").then((r) => r.json()),
+      fetch("/api/deposit-submissions").then((r) => r.json()),
+    ];
     if (isAdmin) fetches.push(fetch("/api/members").then((r) => r.json()));
-    Promise.all(fetches).then(([c, m]) => {
+    Promise.all(fetches).then(([c, s, m]) => {
       setContributions(Array.isArray(c) ? c : []);
+      setSubmissions(Array.isArray(s) ? s : []);
       if (m) setMembers(Array.isArray(m) ? m : []);
       setLoading(false);
     });
@@ -146,6 +157,45 @@ export default function ContributionsPage() {
     setShowEdit(true);
   }
 
+  async function handleSubmitDeposit(e) {
+    e.preventDefault(); setSubmitting(true);
+    try {
+      let receipt_url = null;
+      if (submitReceipt) {
+        setUploading(true);
+        receipt_url = await uploadReceipt(submitReceipt);
+        setUploading(false);
+      }
+      const res = await fetch("/api/deposit-submissions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...submitForm, receipt_url }) });
+      if (res.ok) {
+        const data = await res.json();
+        setSubmissions([data, ...submissions]);
+        setShowSubmit(false);
+        setSubmitForm({ amount: "", date: new Date().toISOString().split("T")[0], bank_ref: "", notes: "" });
+        setSubmitReceipt(null);
+        toast?.("Deposit submitted for review", "success");
+      } else { const err = await res.json(); toast?.(err.error, "error"); }
+    } catch (err) { toast?.(err.message, "error"); setUploading(false); }
+    setSubmitting(false);
+  }
+
+  async function handleReview(id, action) {
+    setSubmitting(true);
+    const body = { id, action };
+    if (action === "reject") body.rejection_reason = rejectReason;
+    const res = await fetch("/api/deposit-submissions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (res.ok) {
+      const data = await res.json();
+      setSubmissions(submissions.map((s) => s.id === id ? data : s));
+      if (action === "approve" && data.contribution) setContributions([data.contribution, ...contributions]);
+      setRejectId(null); setRejectReason("");
+      toast?.(action === "approve" ? "Deposit approved and recorded" : "Submission rejected", "success");
+    } else { const err = await res.json(); toast?.(err.error, "error"); }
+    setSubmitting(false);
+  }
+
+  const pendingSubmissions = submissions.filter((s) => s.status === "pending");
+
   if (loading) return <SkeletonPage cards={3} rows={6} />;
 
   return (
@@ -155,13 +205,73 @@ export default function ContributionsPage() {
           <h1 className="text-2xl font-bold">{isAdmin ? "All Contributions" : "My Contributions"}</h1>
           <p className="text-sm text-gray-500 mt-1">{contributions.length} records</p>
         </div>
-        {isAdmin && (
+        {isAdmin ? (
           <div className="flex gap-2">
             <button onClick={() => setShowBatch(true)} className={`${btnSecondary} px-4 flex items-center gap-2`}><DollarSign size={14} />Record Monthly</button>
             <button onClick={() => setShowAdd(true)} className={`${btnPrimary} px-4 flex items-center gap-2`}><Plus size={14} />Add Single</button>
           </div>
+        ) : (
+          <button onClick={() => setShowSubmit(true)} className={`${btnPrimary} px-4 flex items-center gap-2`}><Send size={14} />Submit Deposit</button>
         )}
       </div>
+
+      {/* Admin: Pending deposit submissions */}
+      {isAdmin && pendingSubmissions.length > 0 && (
+        <div className="card mb-6 p-0 overflow-hidden" style={{ borderColor: "rgba(217,119,6,0.3)" }}>
+          <div className="px-4 py-3 border-b border-surface-3 flex justify-between items-center">
+            <div className="text-sm font-semibold text-amber-400">{pendingSubmissions.length} deposit{pendingSubmissions.length > 1 ? "s" : ""} awaiting review</div>
+          </div>
+          <div className="divide-y divide-surface-3">
+            {pendingSubmissions.map((s) => (
+              <div key={s.id} className="px-4 py-3 flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{s.members?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</div>
+                  <div className="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
+                    <span>{fmtDate(s.date)}</span>
+                    {s.bank_ref && <span className="font-mono">{s.bank_ref}</span>}
+                    {s.receipt_url && <a href={s.receipt_url} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:text-brand-400 inline-flex items-center gap-1"><Paperclip size={10} />Receipt</a>}
+                    {s.notes && <span className="text-gray-600">— {s.notes}</span>}
+                  </div>
+                </div>
+                <div className="font-mono font-semibold text-green-400">{fmtUGX(s.amount)}</div>
+                {rejectId === s.id ? (
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <input type="text" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Reason (optional)" className={`${inputClass} text-xs flex-1 sm:w-48`} />
+                    <button onClick={() => handleReview(s.id, "reject")} disabled={submitting} className="px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white text-xs rounded-lg">Reject</button>
+                    <button onClick={() => { setRejectId(null); setRejectReason(""); }} className="text-gray-500 text-xs">Cancel</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button onClick={() => handleReview(s.id, "approve")} disabled={submitting} className="px-3 py-1.5 bg-green-700 hover:bg-green-800 text-white text-xs rounded-lg flex items-center gap-1"><Check size={12} />Approve</button>
+                    <button onClick={() => setRejectId(s.id)} className="px-3 py-1.5 bg-surface-2 hover:bg-surface-3 text-gray-400 text-xs rounded-lg flex items-center gap-1"><X size={12} />Reject</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Member: My submissions history */}
+      {!isAdmin && submissions.length > 0 && (
+        <div className="card mb-6 p-0 overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-3"><div className="text-sm font-semibold">My Submissions</div></div>
+          <div className="divide-y divide-surface-3">
+            {submissions.map((s) => (
+              <div key={s.id} className="px-4 py-3 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-gray-500">{fmtDate(s.date)} {s.bank_ref && <span className="font-mono ml-2">{s.bank_ref}</span>}</div>
+                  {s.notes && <div className="text-xs text-gray-600 mt-0.5">{s.notes}</div>}
+                </div>
+                <div className="font-mono font-semibold text-sm">{fmtUGX(s.amount)}</div>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${s.status === "approved" ? "bg-green-900/20 text-green-400" : s.status === "rejected" ? "bg-red-900/20 text-red-400" : "bg-amber-900/20 text-amber-400"}`}>
+                  {s.status === "pending" && <Clock size={10} className="inline mr-1" />}{s.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -271,6 +381,33 @@ export default function ContributionsPage() {
             )}
           </FormField>
           <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowEdit(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting || uploading} className={`flex-1 ${btnPrimary}`}>{uploading ? "Uploading..." : submitting ? "Saving..." : "Save Changes"}</button></div>
+        </form>
+      </Modal>
+
+      {/* Member Submit Deposit Modal */}
+      <Modal open={showSubmit} onClose={() => setShowSubmit(false)} title="Submit Deposit for Review">
+        <form onSubmit={handleSubmitDeposit} className="space-y-1">
+          <FormField label="Amount (UGX)"><input type="number" value={submitForm.amount} onChange={(e) => setSubmitForm({ ...submitForm, amount: e.target.value })} required min="1" className={inputClass} /></FormField>
+          <FormField label="Date"><input type="date" value={submitForm.date} onChange={(e) => setSubmitForm({ ...submitForm, date: e.target.value })} required max={new Date().toISOString().split("T")[0]} className={inputClass} /></FormField>
+          <FormField label="Bank Reference"><input type="text" value={submitForm.bank_ref} onChange={(e) => setSubmitForm({ ...submitForm, bank_ref: e.target.value })} className={inputClass} placeholder="e.g. S79513300" /></FormField>
+          <FormField label="Notes"><input type="text" value={submitForm.notes} onChange={(e) => setSubmitForm({ ...submitForm, notes: e.target.value })} className={inputClass} placeholder="e.g. April 2026 deposit" /></FormField>
+          <FormField label="Receipt (recommended)">
+            {submitReceipt ? (
+              <div className="flex items-center gap-2 text-sm text-gray-300">
+                <Paperclip size={14} className="text-brand-500" />
+                <span className="truncate flex-1">{submitReceipt.name}</span>
+                <button type="button" onClick={() => setSubmitReceipt(null)} className="text-gray-500 hover:text-red-400"><X size={14} /></button>
+              </div>
+            ) : (
+              <label className={`${inputClass} cursor-pointer flex items-center gap-2 text-gray-500`}>
+                <Paperclip size={14} />
+                <span>Attach receipt image or PDF</span>
+                <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setSubmitReceipt(e.target.files?.[0] || null)} />
+              </label>
+            )}
+          </FormField>
+          <p className="text-[11px] text-gray-500 pt-1">Your submission will be reviewed by an admin before it is recorded.</p>
+          <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowSubmit(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting || uploading} className={`flex-1 ${btnPrimary}`}>{uploading ? "Uploading..." : submitting ? "Submitting..." : "Submit"}</button></div>
         </form>
       </Modal>
 

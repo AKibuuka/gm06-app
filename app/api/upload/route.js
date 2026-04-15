@@ -31,8 +31,8 @@ function detectFileType(buffer) {
 // POST /api/upload — upload a receipt image to Supabase Storage
 export async function POST(request) {
   const session = await getSession();
-  if (!session || !isAdmin(session)) {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const formData = await request.formData();
