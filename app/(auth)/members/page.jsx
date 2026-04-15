@@ -128,7 +128,7 @@ export default function MembersPage() {
       const sa = a.snapshot, sb = b.snapshot;
       if (sortBy === "value") return (sb?.portfolio_value || 0) - (sa?.portfolio_value || 0);
       if (sortBy === "name") return a.name.localeCompare(b.name);
-      if (sortBy === "arrears") return (sa?.advance_contribution || 0) - (sb?.advance_contribution || 0);
+      if (sortBy === "arrears") return (sb?.contribution_arrears || 0) - (sa?.contribution_arrears || 0);
       return 0;
     });
 
@@ -173,8 +173,8 @@ export default function MembersPage() {
               <div className={`text-right font-semibold ${ret >= 0 ? "text-green-400" : "text-red-400"}`}>{ret >= 0 ? "+" : ""}{ret}%</div>
               <div className="hidden sm:block text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
               <div className="hidden sm:block text-right">
-                <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.advance_contribution || 0) >= 0 ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>
-                  {(s?.advance_contribution || 0) >= 0 ? "Current" : `−${fmtShort(Math.abs(s.advance_contribution))}`}
+                <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.contribution_arrears || 0) > 0 ? "bg-red-900/20 text-red-400" : "bg-green-900/20 text-green-400"}`}>
+                  {(s?.contribution_arrears || 0) > 0 ? `−${fmtShort(s.contribution_arrears)}` : "Current"}
                 </span>
               </div>
               <div className="hidden sm:block text-center">

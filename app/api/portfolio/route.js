@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 export const maxDuration = 15;
-import { getSession } from "@/lib/auth";
+import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 import { getPortfolioGains } from "@/lib/valuation";
 
@@ -17,11 +17,17 @@ export async function GET() {
   let totalValue = 0;
   let totalCost = 0;
 
+  const admin = isAdmin(session);
+
   (investments || []).forEach((inv) => {
     if (!summary[inv.asset_class]) summary[inv.asset_class] = { value: 0, cost: 0, investments: [] };
     summary[inv.asset_class].value += inv.current_value || 0;
     summary[inv.asset_class].cost += inv.cost_basis || 0;
-    summary[inv.asset_class].investments.push(inv);
+    // Hide borrower names from non-admin members
+    const safeInv = !admin && inv.asset_class === "loans"
+      ? { ...inv, name: "Member Loan", ticker: null }
+      : inv;
+    summary[inv.asset_class].investments.push(safeInv);
     totalValue += inv.current_value || 0;
     totalCost += inv.cost_basis || 0;
   });

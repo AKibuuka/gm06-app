@@ -1,26 +1,28 @@
 import { NextResponse } from "next/server";
 export const maxDuration = 30;
-import { getSession, isAdmin } from "@/lib/auth";
 import { getServiceClient } from "@/lib/supabase";
 
-// GET /api/snapshots — list portfolio snapshots (admin only)
-export async function GET() {
-  const session = await getSession();
-  if (!session || !isAdmin(session)) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+// Vercel Cron Job — runs at 11:55 PM on the last day of every month
+// Generates the monthly member + portfolio snapshot automatically
+export async function GET(request) {
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
 
-  const db = getServiceClient();
-  const { data } = await db.from("portfolio_snapshots").select("*").order("date", { ascending: false }).limit(50);
-  return NextResponse.json(data || []);
-}
+  if (!cronSecret) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
+  }
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-// POST /api/snapshots — generate a new monthly valuation (admin only)
-// Body: { date: "2026-04-01" }
-export async function POST(request) {
-  const session = await getSession();
-  if (!session || !isAdmin(session)) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+  // Only run on the last day of the month
+  const now = new Date();
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  if (now.getDate() !== lastDay) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "Not the last day of the month" });
+  }
 
-  const { date } = await request.json();
-  if (!date) return NextResponse.json({ error: "date is required (YYYY-MM-DD)" }, { status: 400 });
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
   const db = getServiceClient();
 
@@ -30,7 +32,6 @@ export async function POST(request) {
 
   const assetTotals = {};
   let totalPortfolioValue = 0;
-
   for (const inv of investments) {
     const cls = inv.asset_class;
     if (!assetTotals[cls]) assetTotals[cls] = 0;
@@ -42,13 +43,12 @@ export async function POST(request) {
   const { data: members } = await db.from("members").select("id, name, monthly_contribution").eq("is_active", true);
   if (!members?.length) return NextResponse.json({ error: "No active members" }, { status: 400 });
 
-  // 3. Fetch ALL contributions up to the date in a single query (avoids N+1)
+  // 3. Fetch ALL contributions up to the date
   const { data: allContribs } = await db
     .from("contributions")
     .select("member_id, amount, type")
     .lte("date", date);
 
-  // Group contributions by member in memory
   const memberContributions = {};
   for (const m of members) {
     memberContributions[m.id] = { totalInvested: 0, netContribution: 0, fines: 0, expenses: 0 };
@@ -64,22 +64,21 @@ export async function POST(request) {
     }
   }
 
-  // 4. Calculate total club contributions (sum of all members' net contributions)
+  // 4. Calculate total club contributions
   const totalClubContributions = Object.values(memberContributions).reduce((s, c) => s + c.netContribution, 0);
 
-  // 4b. Fetch contribution settings for arrears calculation
+  // 4b. Fetch contribution settings for arrears
   const { data: contribSettings } = await db
     .from("settings")
     .select("key, value")
     .in("key", ["required_contribution", "contribution_baseline", "contribution_baseline_date"]);
-  const contribSettingsMap = {};
-  (contribSettings || []).forEach((s) => { contribSettingsMap[s.key] = s.value; });
+  const settingsMap = {};
+  (contribSettings || []).forEach((s) => { settingsMap[s.key] = s.value; });
 
-  const requiredAmount = parseFloat(contribSettingsMap.required_contribution) || 0;
-  const baseline = parseFloat(contribSettingsMap.contribution_baseline) || 0;
-  const baselineDate = contribSettingsMap.contribution_baseline_date || "2026-03-31";
+  const requiredAmount = parseFloat(settingsMap.required_contribution) || 0;
+  const baseline = parseFloat(settingsMap.contribution_baseline) || 0;
+  const baselineDate = settingsMap.contribution_baseline_date || "2026-03-31";
 
-  // Count complete months since baseline — contribution is due at month-end
   const bd = new Date(baselineDate);
   const sd = new Date(date);
   const monthDiff = (sd.getFullYear() - bd.getFullYear()) * 12 + (sd.getMonth() - bd.getMonth());
@@ -87,18 +86,14 @@ export async function POST(request) {
   const monthsAfterBaseline = Math.max(0, sd.getDate() >= lastDayOfMonth ? monthDiff : monthDiff - 1);
   const totalExpected = baseline + monthsAfterBaseline * requiredAmount;
 
-  // 5. Calculate each member's share of portfolio
+  // 5. Calculate each member's share and arrears
   const memberSnapshots = [];
   for (const m of members) {
     const mc = memberContributions[m.id] || { totalInvested: 0, netContribution: 0 };
-
     const share = totalClubContributions > 0 ? mc.netContribution / totalClubContributions : 1 / members.length;
     const portfolioValue = totalPortfolioValue * share;
-
     const avgContribution = totalClubContributions / members.length;
     const advance = mc.netContribution - avgContribution;
-
-    // Arrears: expected cumulative - actual deposits
     const arrears = Math.max(0, totalExpected - mc.totalInvested);
 
     memberSnapshots.push({
@@ -111,7 +106,7 @@ export async function POST(request) {
     });
   }
 
-  // 6. Upsert member snapshots (unique constraint on member_id + date)
+  // 6. Upsert member snapshots
   const failedMembers = [];
   for (const snap of memberSnapshots) {
     const { error } = await db.from("member_snapshots").upsert(snap, { onConflict: "member_id,date" });

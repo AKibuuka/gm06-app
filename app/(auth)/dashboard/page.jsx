@@ -4,7 +4,7 @@ import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
 import { StatCard, DonutChart, Sparkline } from "@/components/Charts";
 import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
-import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, Clock, Landmark, Wallet, BarChart3, MessageSquare, DollarSign, PieChart } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, CheckCircle, Clock, Landmark, Wallet, BarChart3, MessageSquare, DollarSign, PieChart } from "lucide-react";
 import { CLUB_SHORT } from "@/lib/constants";
 import useTitle from "@/lib/useTitle";
 import Avatar, { titleCase } from "@/components/Avatar";
@@ -32,16 +32,56 @@ function MemberDashboard({ hideHeader = false }) {
 
   if (loading) return <SkeletonPage cards={4} rows={3} />;
   if (error) return <div className="card border-red-800/30 text-red-400 text-sm">{error}</div>;
-  if (!data?.valuation) return (
-    <div className="animate-in">
-      {!hideHeader && <div className="mb-7"><h1 className="text-2xl font-bold">Welcome to {CLUB_SHORT}</h1></div>}
-      <div className="card text-center py-12">
-        <Wallet size={40} className="text-gray-600 mx-auto mb-4" />
-        <div className="text-sm font-semibold text-gray-400 mb-2">Your portfolio is being set up</div>
-        <div className="text-xs text-gray-500 max-w-sm mx-auto">The treasurer needs to record contributions and run the first monthly valuation. Once that's done, you'll see your portfolio value, holdings, and growth here.</div>
+  if (!data?.valuation) {
+    const cs = data?.contribution_status;
+    return (
+      <div className="animate-in">
+        {!hideHeader && <div className="mb-7"><h1 className="text-2xl font-bold">Welcome to {CLUB_SHORT}</h1></div>}
+        {cs && (
+          <div className="card mb-5" style={{
+            borderColor: cs.is_due ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)",
+            background: cs.is_due ? "rgba(127,29,29,0.1)" : "rgba(20,83,45,0.1)",
+          }}>
+            <div className="flex items-center gap-3">
+              {cs.is_due
+                ? <AlertTriangle size={18} className="text-red-400 shrink-0" />
+                : <CheckCircle size={18} className="text-green-400 shrink-0" />
+              }
+              <div className="flex-1">
+                <div className={`text-sm font-semibold ${cs.is_due ? "text-red-400" : "text-green-400"}`}>
+                  {cs.is_due ? "Contribution Due" : "Contributions Up to Date"}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 space-y-1.5 pl-[30px]">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">Fully paid-up member target</span>
+                <span className="font-mono text-white">{fmtUGX(cs.total_expected)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">Your total contributions</span>
+                <span className="font-mono text-white">{fmtUGX(cs.total_paid)}</span>
+              </div>
+              {cs.is_due && (
+                <>
+                  <div className="border-t border-white/10 my-1.5" />
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-semibold">Amount due to be fully paid up</span>
+                    <span className="font-mono text-red-400 font-semibold">{fmtUGX(cs.total_arrears)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="card text-center py-12">
+          <Wallet size={40} className="text-gray-600 mx-auto mb-4" />
+          <div className="text-sm font-semibold text-gray-400 mb-2">Your portfolio is being set up</div>
+          <div className="text-xs text-gray-500 max-w-sm mx-auto">The treasurer needs to record contributions and run the first monthly valuation. Once that's done, you'll see your portfolio value, holdings, and growth here.</div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   const { member, valuation: v, history, contributions, unpaid_fines, club_history, active_loan, contribution_status, announcements, gains, club_gains } = data;
   const segments = ((v && v.allocation) || []).filter((a) => a.pct > 0).map((a) => ({
@@ -86,34 +126,56 @@ function MemberDashboard({ hideHeader = false }) {
         })}
       </div>
 
-      {/* Notifications */}
-      {contribution_status?.is_due && (
-        <div className="card mb-5" style={{ borderColor: "rgba(239,68,68,0.3)", background: "rgba(127,29,29,0.1)" }}>
+      {/* Contribution Status */}
+      {contribution_status && (
+        <div className="card mb-5" style={{
+          borderColor: contribution_status.is_due ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)",
+          background: contribution_status.is_due ? "rgba(127,29,29,0.1)" : "rgba(20,83,45,0.1)",
+        }}>
           <div className="flex items-center gap-3">
-            <AlertTriangle size={18} className="text-red-400 shrink-0" />
+            {contribution_status.is_due
+              ? <AlertTriangle size={18} className="text-red-400 shrink-0" />
+              : <CheckCircle size={18} className="text-green-400 shrink-0" />
+            }
             <div className="flex-1">
-              <div className="text-sm font-semibold text-red-400">Contribution Due</div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                Total outstanding: <span className="text-red-400 font-mono font-semibold">{fmtUGX(contribution_status.total_arrears)}</span>
+              <div className={`text-sm font-semibold ${contribution_status.is_due ? "text-red-400" : "text-green-400"}`}>
+                {contribution_status.is_due ? "Contribution Due" : "Contributions Up to Date"}
               </div>
             </div>
           </div>
           <div className="mt-3 space-y-1.5 pl-[30px]">
-            {contribution_status.previous_arrears > 0 && (
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400">
-                  Past arrears <span className="text-gray-500">({contribution_status.months_behind} month{contribution_status.months_behind !== 1 ? "s" : ""} missed)</span>
-                </span>
-                <span className="font-mono text-red-400">{fmtUGX(contribution_status.previous_arrears)}</span>
-              </div>
-            )}
-            {contribution_status.current_month_remaining > 0 && (
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400">
-                  This month <span className="text-gray-500">({fmtUGX(contribution_status.paid_this_month)} of {fmtUGX(contribution_status.required)} paid)</span>
-                </span>
-                <span className="font-mono text-amber-400">{fmtUGX(contribution_status.current_month_remaining)}</span>
-              </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-400">Fully paid-up member target</span>
+              <span className="font-mono text-white">{fmtUGX(contribution_status.total_expected)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-400">Your total contributions</span>
+              <span className="font-mono text-white">{fmtUGX(contribution_status.total_paid)}</span>
+            </div>
+            {contribution_status.is_due && (
+              <>
+                <div className="border-t border-white/10 my-1.5" />
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400 font-semibold">Amount due to be fully paid up</span>
+                  <span className="font-mono text-red-400 font-semibold">{fmtUGX(contribution_status.total_arrears)}</span>
+                </div>
+                {contribution_status.previous_arrears > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">
+                      Past arrears <span className="text-gray-500">({contribution_status.months_behind} month{contribution_status.months_behind !== 1 ? "s" : ""} missed)</span>
+                    </span>
+                    <span className="font-mono text-red-400">{fmtUGX(contribution_status.previous_arrears)}</span>
+                  </div>
+                )}
+                {contribution_status.current_month_remaining > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">
+                      This month <span className="text-gray-500">({fmtUGX(contribution_status.paid_this_month)} of {fmtUGX(contribution_status.required)} paid)</span>
+                    </span>
+                    <span className="font-mono text-amber-400">{fmtUGX(contribution_status.current_month_remaining)}</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -447,8 +509,8 @@ function AdminDashboard() {
   const totalInvested = members.reduce((s, m) => s + (m.snapshot?.total_invested || 0), 0);
   const totalGain = totalValue - totalInvested;
   const returnPct = totalInvested > 0 ? ((totalGain / totalInvested) * 100).toFixed(1) : 0;
-  const arrearsMembers = members.filter((m) => (m.snapshot?.advance_contribution || 0) < 0);
-  const totalArrears = arrearsMembers.reduce((s, m) => s + m.snapshot.advance_contribution, 0);
+  const arrearsMembers = members.filter((m) => (m.snapshot?.contribution_arrears || 0) > 0);
+  const totalArrears = arrearsMembers.reduce((s, m) => s + m.snapshot.contribution_arrears, 0);
 
   const segments = Object.entries(summary).map(([cls, data]) => ({
     label: ASSET_CLASS_LABELS[cls] || cls, pct: data.percentage || 0, color: ASSET_CLASS_COLORS[cls] || "#666", value: data.value,
@@ -508,7 +570,7 @@ function AdminDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
         <StatCard label="Portfolio Value" value={fmtUGX(totalValue)} sub={`${returnPct >= 0 ? "+" : ""}${returnPct}% all-time`} color="#22C55E" />
         <StatCard label="Total Invested" value={fmtUGX(totalInvested)} sub={`${members.length} members`} color="#3B82F6" />
-        <StatCard label="Arrears" value={fmtUGX(Math.abs(totalArrears))} sub={`${arrearsMembers.length} members behind`} color="#EF4444" />
+        <StatCard label="Arrears" value={fmtUGX(totalArrears)} sub={`${arrearsMembers.length} members behind`} color="#EF4444" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
         <StatCard label="Today" value={clubGains.daily ? `${clubGains.daily.gain >= 0 ? "+" : ""}${fmtShort(clubGains.daily.gain)}` : "—"} sub={clubGains.daily ? `${clubGains.daily.pct >= 0 ? "+" : ""}${clubGains.daily.pct}%` : "No price data"} color={!clubGains.daily ? "#6B7280" : clubGains.daily.gain >= 0 ? "#22C55E" : "#EF4444"} />
@@ -535,7 +597,7 @@ function AdminDashboard() {
       <div className="card p-0 overflow-hidden">
         <div className="px-5 py-3 border-b border-surface-3 flex justify-between items-center"><span className="text-sm font-semibold">All Members</span><span className="text-xs text-gray-500">{members.length} members</span></div>
         <div className="overflow-x-auto">
-          {members.sort((a, b) => (b.snapshot?.portfolio_value || 0) - (a.snapshot?.portfolio_value || 0)).map((m) => {
+          {[...members].sort((a, b) => (b.snapshot?.portfolio_value || 0) - (a.snapshot?.portfolio_value || 0)).map((m) => {
             const s = m.snapshot;
             const ret = s && s.total_invested > 0 ? (((s.portfolio_value - s.total_invested) / s.total_invested) * 100).toFixed(1) : 0;
             return (
@@ -544,7 +606,7 @@ function AdminDashboard() {
                 <div className="text-right font-mono font-semibold">{fmtShort(s?.portfolio_value || 0)}</div>
                 <div className={`text-right font-semibold ${ret >= 0 ? "text-green-400" : "text-red-400"}`}>{ret >= 0 ? "+" : ""}{ret}%</div>
                 <div className="hidden sm:block text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
-                <div className="hidden sm:block text-right"><span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.advance_contribution || 0) >= 0 ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>{(s?.advance_contribution || 0) >= 0 ? "Current" : `−${fmtShort(Math.abs(s.advance_contribution))}`}</span></div>
+                <div className="hidden sm:block text-right"><span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.contribution_arrears || 0) > 0 ? "bg-red-900/20 text-red-400" : "bg-green-900/20 text-green-400"}`}>{(s?.contribution_arrears || 0) > 0 ? `−${fmtShort(s.contribution_arrears)}` : "Current"}</span></div>
               </div>
             );
           })}

@@ -110,8 +110,8 @@ export default function ReportsPage() {
   }
 
   // ── Admin View ──
-  const arrearsMembers = members.filter((m) => (m.snapshot?.advance_contribution || 0) < 0);
-  const totalArrears = arrearsMembers.reduce((s, m) => s + Math.abs(m.snapshot?.advance_contribution || 0), 0);
+  const arrearsMembers = members.filter((m) => (m.snapshot?.contribution_arrears || 0) > 0);
+  const totalArrears = arrearsMembers.reduce((s, m) => s + (m.snapshot?.contribution_arrears || 0), 0);
 
   return (
     <div className="animate-in">

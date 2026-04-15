@@ -62,29 +62,28 @@ export async function GET() {
     .limit(1)
     .maybeSingle();
 
-  // Settings (loan + contribution)
+  // Settings (loan + contribution + baseline)
   const { data: allSettings } = await db
     .from("settings")
     .select("key, value")
-    .in("key", ["max_loan_pct", "loan_interest_rate", "required_contribution"]);
+    .in("key", ["max_loan_pct", "loan_interest_rate", "required_contribution", "contribution_baseline", "contribution_baseline_date"]);
   const settingsMap = {};
   (allSettings || []).forEach((s) => { settingsMap[s.key] = s.value; });
 
-  // Contribution status: calculate accumulated arrears + current month
+  // Contribution status: baseline + monthly increments
   const now = new Date();
   const requiredAmount = parseFloat(settingsMap.required_contribution) || 0;
+  const baseline = parseFloat(settingsMap.contribution_baseline) || 0;
+  const baselineDate = settingsMap.contribution_baseline_date || "2026-03-31";
 
-  // Calculate total months of expected contributions since member joined
-  const joinedDate = new Date(member.joined_at);
-  const joinYear = joinedDate.getFullYear();
-  const joinMonth = joinedDate.getMonth(); // 0-based
+  // Completed months since baseline (current month not yet due until month-end)
+  const bd = new Date(baselineDate);
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
-  // Total months including the current month
-  const totalMonths = (currentYear - joinYear) * 12 + (currentMonth - joinMonth) + 1;
+  const monthsCompleted = Math.max(0, (currentYear - bd.getFullYear()) * 12 + (currentMonth - bd.getMonth()) - 1);
 
-  // Total expected contributions
-  const totalExpected = requiredAmount * Math.max(totalMonths, 0);
+  // Total expected from past months (current month shown separately as currentMonthRemaining)
+  const totalExpected = baseline + monthsCompleted * requiredAmount;
 
   // Total deposits ever made by this member
   const { data: allDeposits } = await db
@@ -105,9 +104,9 @@ export async function GET() {
     .reduce((s, c) => s + c.amount, 0);
 
   // Arrears breakdown
-  const totalArrears = Math.max(0, totalExpected - totalPaid); // total amount behind
-  const currentMonthRemaining = Math.max(0, requiredAmount - thisMonthTotal); // what's left this month
-  const previousArrears = Math.max(0, totalArrears - currentMonthRemaining); // accumulated from past months
+  const totalArrears = Math.max(0, totalExpected - totalPaid);
+  const currentMonthRemaining = Math.max(0, requiredAmount - thisMonthTotal);
+  const previousArrears = Math.max(0, totalArrears - currentMonthRemaining);
   const contributionDue = requiredAmount > 0 && totalArrears > 0;
 
   // Unread messages count
@@ -156,6 +155,8 @@ export async function GET() {
     required_contribution: requiredAmount,
     contribution_status: {
       required: requiredAmount,
+      total_expected: totalExpected + requiredAmount, // includes current month
+      total_paid: totalPaid,
       paid_this_month: thisMonthTotal,
       is_due: contributionDue,
       total_arrears: totalArrears,

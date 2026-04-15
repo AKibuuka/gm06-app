@@ -18,15 +18,21 @@ export async function GET() {
 
   if (!members) return NextResponse.json({ error: "Failed to fetch members" }, { status: 500 });
 
-  // Get the LATEST snapshot date dynamically
-  const { data: latestSnap } = await db
+  // Get the latest month-end snapshot date (last day of any month)
+  const { data: allSnapDates } = await db
     .from("member_snapshots")
     .select("date")
     .order("date", { ascending: false })
-    .limit(1)
-    .single();
+    .limit(100);
 
-  const latestDate = latestSnap?.date;
+  let latestDate = null;
+  for (const row of (allSnapDates || [])) {
+    const d = new Date(row.date);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    if (d.getDate() >= lastDay) { latestDate = row.date; break; }
+  }
+  // Fallback to latest snapshot if no month-end snapshot exists
+  if (!latestDate && allSnapDates?.length) latestDate = allSnapDates[0].date;
 
   let snapshotMap = {};
   if (latestDate) {
@@ -37,14 +43,47 @@ export async function GET() {
     (snapshots || []).forEach((s) => { snapshotMap[s.member_id] = s; });
   }
 
+  // Compute real-time arrears (snapshot arrears become stale when contributions are recorded after)
+  const { data: contribSettings } = await db
+    .from("settings")
+    .select("key, value")
+    .in("key", ["required_contribution", "contribution_baseline", "contribution_baseline_date"]);
+  const settingsMap = {};
+  (contribSettings || []).forEach((s) => { settingsMap[s.key] = s.value; });
+
+  const requiredAmount = parseFloat(settingsMap.required_contribution) || 0;
+  const baseline = parseFloat(settingsMap.contribution_baseline) || 0;
+  const baselineDate = settingsMap.contribution_baseline_date || "2026-03-31";
+
+  const now = new Date();
+  const bd = new Date(baselineDate);
+  const monthsCompleted = Math.max(0, (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth()) - 1);
+  const totalExpected = baseline + monthsCompleted * requiredAmount;
+
+  // Fetch all deposits for real-time arrears
+  const { data: allDeposits } = await db
+    .from("contributions")
+    .select("member_id, amount")
+    .eq("type", "deposit");
+
+  const depositsByMember = {};
+  for (const d of (allDeposits || [])) {
+    depositsByMember[d.member_id] = (depositsByMember[d.member_id] || 0) + d.amount;
+  }
+
   // Filter: admin sees all, member sees only self
   const result = members
     .filter((m) => isAdmin(session) || m.id === session.id)
-    .map((m) => ({
-      ...m,
-      snapshot: snapshotMap[m.id] || null,
-      snapshot_date: latestDate || null,
-    }));
+    .map((m) => {
+      const snapshot = snapshotMap[m.id] || null;
+      const totalPaid = depositsByMember[m.id] || 0;
+      const realTimeArrears = Math.max(0, totalExpected - totalPaid);
+      return {
+        ...m,
+        snapshot: snapshot ? { ...snapshot, contribution_arrears: Math.round(realTimeArrears * 100) / 100 } : null,
+        snapshot_date: latestDate || null,
+      };
+    });
 
   return NextResponse.json(result);
 }
