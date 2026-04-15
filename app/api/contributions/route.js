@@ -44,7 +44,7 @@ export async function POST(request) {
   }
 
   const body = await request.json();
-  const { member_id, amount, type, description, date, bank_ref } = body;
+  const { member_id, amount, type, description, date, bank_ref, receipt_url } = body;
 
   if (!member_id || !amount || !type) {
     return NextResponse.json({ error: "member_id, amount, and type are required" }, { status: 400 });
@@ -69,6 +69,7 @@ export async function POST(request) {
       description: description || null,
       bank_ref: bank_ref || null,
       date: contribDate,
+      receipt_url: receipt_url || null,
     })
     .select("*, members(name)")
     .single();
@@ -177,7 +178,8 @@ export async function PUT(request) {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 });
   }
 
-  const { id, amount, type, description, date, bank_ref } = await request.json();
+  const body = await request.json();
+  const { id, amount, type, description, date, bank_ref } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   const db = getServiceClient();
@@ -201,6 +203,7 @@ export async function PUT(request) {
   if (description !== undefined) updates.description = description || null;
   if (date !== undefined) updates.date = date;
   if (bank_ref !== undefined) updates.bank_ref = bank_ref || null;
+  if (body.receipt_url !== undefined) updates.receipt_url = body.receipt_url || null;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });

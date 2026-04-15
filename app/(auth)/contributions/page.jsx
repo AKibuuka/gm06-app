@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@/components/AuthShell";
 import { useToast } from "@/components/Toast";
-import { Plus, DollarSign, ArrowDown, ArrowUp, AlertTriangle, Pencil } from "lucide-react";
+import { Plus, DollarSign, ArrowDown, ArrowUp, AlertTriangle, Pencil, Paperclip, X } from "lucide-react";
 import Modal, { FormField, inputClass, selectClass, btnPrimary, btnSecondary } from "@/components/Modal";
 import { fmtUGX, fmtShort, fmtDate } from "@/lib/format";
 import useTitle from "@/lib/useTitle";
@@ -34,7 +34,10 @@ export default function ContributionsPage() {
   const [batchRefs, setBatchRefs] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
-  const [editForm, setEditForm] = useState({ id: "", amount: "", type: "deposit", description: "", bank_ref: "", date: "" });
+  const [editForm, setEditForm] = useState({ id: "", amount: "", type: "deposit", description: "", bank_ref: "", date: "", receipt_url: "" });
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [editReceiptFile, setEditReceiptFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const fetches = [fetch("/api/contributions").then((r) => r.json())];
@@ -55,20 +58,38 @@ export default function ContributionsPage() {
   const totalDeposits = contributions.filter((c) => c.type === "deposit").reduce((s, c) => s + c.amount, 0);
   const totalFines = contributions.filter((c) => c.type === "fine").reduce((s, c) => s + c.amount, 0);
 
+  async function uploadReceipt(file) {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+    const { url } = await res.json();
+    return url;
+  }
+
   async function handleAdd(e) {
     e.preventDefault(); setSubmitting(true);
-    const res = await fetch("/api/contributions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    if (res.ok) {
-      const data = await res.json();
-      const recordedAmount = parseFloat(form.amount); // capture before reset
-      setContributions([data, ...contributions]);
-      setShowAdd(false);
-      setForm({ member_id: "", amount: "", type: "deposit", description: "", bank_ref: "", date: new Date().toISOString().split("T")[0] });
-      const msg = data.loan_deduction
-        ? `Recorded ${fmtUGX(recordedAmount)} — ${fmtUGX(data.loan_deduction.amount_applied)} applied to loan, ${fmtUGX(data.loan_deduction.excess)} to portfolio`
-        : `Contribution of ${fmtUGX(data.amount)} recorded`;
-      toast?.(msg, "success");
-    } else { const err = await res.json(); toast?.(err.error, "error"); }
+    try {
+      let receipt_url = null;
+      if (receiptFile) {
+        setUploading(true);
+        receipt_url = await uploadReceipt(receiptFile);
+        setUploading(false);
+      }
+      const res = await fetch("/api/contributions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, receipt_url }) });
+      if (res.ok) {
+        const data = await res.json();
+        const recordedAmount = parseFloat(form.amount);
+        setContributions([data, ...contributions]);
+        setShowAdd(false);
+        setForm({ member_id: "", amount: "", type: "deposit", description: "", bank_ref: "", date: new Date().toISOString().split("T")[0] });
+        setReceiptFile(null);
+        const msg = data.loan_deduction
+          ? `Recorded ${fmtUGX(recordedAmount)} — ${fmtUGX(data.loan_deduction.amount_applied)} applied to loan, ${fmtUGX(data.loan_deduction.excess)} to portfolio`
+          : `Contribution of ${fmtUGX(data.amount)} recorded`;
+        toast?.(msg, "success");
+      } else { const err = await res.json(); toast?.(err.error, "error"); }
+    } catch (err) { toast?.(err.message, "error"); setUploading(false); }
     setSubmitting(false);
   }
 
@@ -100,18 +121,28 @@ export default function ContributionsPage() {
 
   async function handleEdit(e) {
     e.preventDefault(); setSubmitting(true);
-    const res = await fetch("/api/contributions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editForm) });
-    if (res.ok) {
-      const data = await res.json();
-      setContributions(contributions.map((c) => c.id === data.id ? data : c));
-      setShowEdit(false);
-      toast?.("Contribution updated", "success");
-    } else { const err = await res.json(); toast?.(err.error, "error"); }
+    try {
+      let receipt_url = editForm.receipt_url;
+      if (editReceiptFile) {
+        setUploading(true);
+        receipt_url = await uploadReceipt(editReceiptFile);
+        setUploading(false);
+      }
+      const res = await fetch("/api/contributions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...editForm, receipt_url }) });
+      if (res.ok) {
+        const data = await res.json();
+        setContributions(contributions.map((c) => c.id === data.id ? data : c));
+        setShowEdit(false);
+        setEditReceiptFile(null);
+        toast?.("Contribution updated", "success");
+      } else { const err = await res.json(); toast?.(err.error, "error"); }
+    } catch (err) { toast?.(err.message, "error"); setUploading(false); }
     setSubmitting(false);
   }
 
   function openEdit(c) {
-    setEditForm({ id: c.id, amount: c.amount, type: c.type, description: c.description || "", bank_ref: c.bank_ref || "", date: c.date });
+    setEditForm({ id: c.id, amount: c.amount, type: c.type, description: c.description || "", bank_ref: c.bank_ref || "", date: c.date, receipt_url: c.receipt_url || "" });
+    setEditReceiptFile(null);
     setShowEdit(true);
   }
 
@@ -171,7 +202,10 @@ export default function ContributionsPage() {
                 <div><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${style.bg}`}><Icon size={10} />{c.type}</span></div>
                 <div className="text-right font-mono font-semibold">{fmtUGX(c.amount)}</div>
                 <div className="hidden sm:block text-gray-500 text-xs font-mono truncate">{c.bank_ref || "—"}</div>
-                <div className="hidden sm:block text-gray-500 text-xs truncate">{c.description || "—"}</div>
+                <div className="hidden sm:block text-gray-500 text-xs truncate flex items-center gap-1">
+                  {c.receipt_url && <a href={c.receipt_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-brand-500 hover:text-brand-400"><Paperclip size={11} /></a>}
+                  {c.description || "—"}
+                </div>
                 {isAdmin && <div className="hidden sm:block"><button onClick={() => openEdit(c)} className="p-2 sm:p-1 rounded hover:bg-surface-3 text-gray-500 hover:text-white"><Pencil size={12} /></button></div>}
               </div>
             );
@@ -188,7 +222,22 @@ export default function ContributionsPage() {
           <FormField label="Date"><input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required max={new Date().toISOString().split("T")[0]} className={inputClass} /></FormField>
           <FormField label="Bank Reference"><input type="text" value={form.bank_ref} onChange={(e) => setForm({ ...form, bank_ref: e.target.value })} className={inputClass} placeholder="e.g. TXN-20260401-001" /></FormField>
           <FormField label="Description"><input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="e.g. April 2026 deposit" /></FormField>
-          <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowAdd(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Saving..." : "Record"}</button></div>
+          <FormField label="Receipt (optional)">
+            {receiptFile ? (
+              <div className="flex items-center gap-2 text-sm text-gray-300">
+                <Paperclip size={14} className="text-brand-500" />
+                <span className="truncate flex-1">{receiptFile.name}</span>
+                <button type="button" onClick={() => setReceiptFile(null)} className="text-gray-500 hover:text-red-400"><X size={14} /></button>
+              </div>
+            ) : (
+              <label className={`${inputClass} cursor-pointer flex items-center gap-2 text-gray-500`}>
+                <Paperclip size={14} />
+                <span>Attach receipt image or PDF</span>
+                <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} />
+              </label>
+            )}
+          </FormField>
+          <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowAdd(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting || uploading} className={`flex-1 ${btnPrimary}`}>{uploading ? "Uploading..." : submitting ? "Saving..." : "Record"}</button></div>
         </form>
       </Modal>
 
@@ -200,7 +249,28 @@ export default function ContributionsPage() {
           <FormField label="Date"><input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} required max={new Date().toISOString().split("T")[0]} className={inputClass} /></FormField>
           <FormField label="Bank Reference"><input type="text" value={editForm.bank_ref} onChange={(e) => setEditForm({ ...editForm, bank_ref: e.target.value })} className={inputClass} /></FormField>
           <FormField label="Description"><input type="text" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className={inputClass} /></FormField>
-          <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowEdit(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting} className={`flex-1 ${btnPrimary}`}>{submitting ? "Saving..." : "Save Changes"}</button></div>
+          <FormField label="Receipt">
+            {editForm.receipt_url && !editReceiptFile ? (
+              <div className="flex items-center gap-2 text-sm">
+                <Paperclip size={14} className="text-green-400" />
+                <a href={editForm.receipt_url} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline truncate flex-1">View receipt</a>
+                <button type="button" onClick={() => setEditForm({ ...editForm, receipt_url: "" })} className="text-gray-500 hover:text-red-400 text-xs">Remove</button>
+              </div>
+            ) : editReceiptFile ? (
+              <div className="flex items-center gap-2 text-sm text-gray-300">
+                <Paperclip size={14} className="text-brand-500" />
+                <span className="truncate flex-1">{editReceiptFile.name}</span>
+                <button type="button" onClick={() => setEditReceiptFile(null)} className="text-gray-500 hover:text-red-400"><X size={14} /></button>
+              </div>
+            ) : (
+              <label className={`${inputClass} cursor-pointer flex items-center gap-2 text-gray-500`}>
+                <Paperclip size={14} />
+                <span>Attach receipt image or PDF</span>
+                <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setEditReceiptFile(e.target.files?.[0] || null)} />
+              </label>
+            )}
+          </FormField>
+          <div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowEdit(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button><button type="submit" disabled={submitting || uploading} className={`flex-1 ${btnPrimary}`}>{uploading ? "Uploading..." : submitting ? "Saving..." : "Save Changes"}</button></div>
         </form>
       </Modal>
 
