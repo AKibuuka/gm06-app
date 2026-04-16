@@ -28,14 +28,17 @@ function GroupChat({ user }) {
     if (!loading) setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   }, [messages.length, loading]);
 
-  // Poll for new messages every 30s
+  // Poll for new messages — every 2min, plus immediately when tab regains focus
   useEffect(() => {
-    const interval = setInterval(() => {
+    function poll() {
       fetch("/api/group-messages")
         .then((r) => r.json())
         .then((d) => { if (Array.isArray(d)) setMessages(d); });
-    }, 30000);
-    return () => clearInterval(interval);
+    }
+    function onVisible() { if (document.visibilityState === "visible") poll(); }
+    document.addEventListener("visibilitychange", onVisible);
+    const interval = setInterval(poll, 2 * 60 * 1000);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
   async function handleSend(e) {

@@ -45,7 +45,7 @@ export default function Sidebar({ user, onClose }) {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  // Fetch unread message count (lightweight endpoint)
+  // Fetch unread message count — on mount + when navigating back to app
   useEffect(() => {
     function fetchUnread() {
       fetch("/api/messages/unread")
@@ -54,8 +54,12 @@ export default function Sidebar({ user, onClose }) {
         .catch(() => {});
     }
     fetchUnread();
-    const interval = setInterval(fetchUnread, 60000);
-    return () => clearInterval(interval);
+    // Re-check when tab becomes visible (covers returning from another tab)
+    function onVisible() { if (document.visibilityState === "visible") fetchUnread(); }
+    document.addEventListener("visibilitychange", onVisible);
+    // Light poll every 5 minutes instead of 60s (saves ~1300 requests/day)
+    const interval = setInterval(fetchUnread, 5 * 60 * 1000);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
   function navigate(href) {

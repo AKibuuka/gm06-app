@@ -13,18 +13,16 @@ export default function AuthShell({ user, children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
 
-  // Session expiry check — verify session is still valid every 5 minutes
+  // Session expiry check — on visibility change only (no continuous polling)
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const res = await fetch("/api/messages/unread");
-        if (res.status === 401) {
-          router.push("/login?expired=1");
-        }
-      } catch {}
-    };
-    const interval = setInterval(checkSession, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    function checkSession() {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/messages/unread").then((res) => {
+        if (res.status === 401) router.push("/login?expired=1");
+      }).catch(() => {});
+    }
+    document.addEventListener("visibilitychange", checkSession);
+    return () => document.removeEventListener("visibilitychange", checkSession);
   }, [router]);
 
   return (
