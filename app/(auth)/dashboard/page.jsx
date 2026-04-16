@@ -1,662 +1,230 @@
-"use client";
-import { useState, useEffect } from "react";
-import { useUser } from "@/components/AuthShell";
-import { useToast } from "@/components/Toast";
-import { StatCard, DonutChart, Sparkline } from "@/components/Charts";
-import { fmtUGX, fmtShort, fmtDate, ASSET_CLASS_LABELS, ASSET_CLASS_COLORS } from "@/lib/format";
-import { TrendingUp, TrendingDown, ArrowDown, ArrowUp, AlertTriangle, CheckCircle, Clock, Landmark, Wallet, BarChart3, MessageSquare, DollarSign, PieChart } from "lucide-react";
-import { CLUB_SHORT } from "@/lib/constants";
-import useTitle from "@/lib/useTitle";
-import Avatar, { titleCase } from "@/components/Avatar";
-import { SkeletonPage } from "@/components/Skeleton";
-import AdminNotifications from "@/components/AdminNotifications";
+import { cookies } from "next/headers";
+import { verifyToken, isAdmin as checkAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getServiceClient } from "@/lib/supabase";
+import { getMemberValuation, getMemberHistory, getPortfolioGains } from "@/lib/valuation";
+import DashboardClient from "./DashboardClient";
 
-function MemberDashboard({ hideHeader = false }) {
-  useTitle("Dashboard");
-  const [data, setData] = useState(null);
-  const [clubActivity, setClubActivity] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [tab, setTab] = useState("personal");
+export const metadata = { title: "Dashboard — GM06" };
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/me").then((r) => { if (!r.ok) throw new Error("Failed to load"); return r.json(); }),
-      fetch("/api/activity").then((r) => r.json()).catch(() => []),
-    ]).then(([me, act]) => {
-      setData(me);
-      setClubActivity(Array.isArray(act) ? act : []);
-    }).catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+export default async function DashboardPage() {
+  // Auth — layout already verified, but we need the session payload
+  const cookieStore = await cookies();
+  const token = cookieStore.get("gm06_session")?.value;
+  if (!token) redirect("/login");
+  const session = verifyToken(token);
+  if (!session) redirect("/login");
 
-  if (loading) return <SkeletonPage cards={4} rows={3} />;
-  if (error) return <div className="card border-red-800/30 text-red-400 text-sm">{error}</div>;
-  if (!data?.valuation) {
-    const cs = data?.contribution_status;
-    return (
-      <div className="animate-in">
-        {!hideHeader && <div className="mb-7"><h1 className="text-2xl font-bold">Welcome to {CLUB_SHORT}</h1></div>}
-        {cs && (
-          <div className="card mb-5" style={{
-            borderColor: cs.is_due ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)",
-            background: cs.is_due ? "rgba(127,29,29,0.1)" : "rgba(20,83,45,0.1)",
-          }}>
-            <div className="flex items-center gap-3">
-              {cs.is_due
-                ? <AlertTriangle size={18} className="text-red-400 shrink-0" />
-                : <CheckCircle size={18} className="text-green-400 shrink-0" />
-              }
-              <div className="flex-1">
-                <div className={`text-sm font-semibold ${cs.is_due ? "text-red-400" : "text-green-400"}`}>
-                  {cs.is_due ? "Contribution Due" : "Contributions Up to Date"}
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 space-y-1.5 pl-[30px]">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400">Fully paid-up member target</span>
-                <span className="font-mono text-white">{fmtUGX(cs.total_expected)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400">Your total contributions</span>
-                <span className="font-mono text-white">{fmtUGX(cs.total_paid)}</span>
-              </div>
-              {cs.is_due && (
-                <>
-                  <div className="border-t border-white/10 my-1.5" />
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400 font-semibold">Amount due to be fully paid up</span>
-                    <span className="font-mono text-red-400 font-semibold">{fmtUGX(cs.total_arrears)}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-        <div className="card text-center py-12">
-          <Wallet size={40} className="text-gray-600 mx-auto mb-4" />
-          <div className="text-sm font-semibold text-gray-400 mb-2">Your portfolio is being set up</div>
-          <div className="text-xs text-gray-500 max-w-sm mx-auto">The treasurer needs to record contributions and run the first monthly valuation. Once that's done, you'll see your portfolio value, holdings, and growth here.</div>
-        </div>
-      </div>
-    );
-  }
+  const db = getServiceClient();
+  const admin = checkAdmin(session);
 
-  const { member, valuation: v, history, contributions, unpaid_fines, club_history, active_loan, contribution_status, announcements, gains, club_gains } = data;
-  const segments = ((v && v.allocation) || []).filter((a) => a.pct > 0).map((a) => ({
-    label: ASSET_CLASS_LABELS[a.asset_class] || a.asset_class, pct: a.pct, color: ASSET_CLASS_COLORS[a.asset_class] || "#666", value: a.member_value, clubValue: a.club_value,
-  }));
-  const up = v.total_gain >= 0;
+  // ── Fire ALL queries in parallel ──────────────────────────────────
+  const promises = [
+    /* 0  */ db.from("members").select("id, name, email, phone, role, monthly_contribution, joined_at, mfa_enabled").eq("id", session.id).single(),
+    /* 1  */ getMemberValuation(session.id),
+    /* 2  */ getPortfolioGains(),
+    /* 3  */ getMemberHistory(session.id),
+    /* 4  */ db.from("contributions").select("id, amount, type, description, date").eq("member_id", session.id).order("date", { ascending: false }).limit(20),
+    /* 5  */ db.from("fines").select("id, amount, reason, date, is_paid").eq("member_id", session.id).order("date", { ascending: false }).limit(20),
+    /* 6  */ db.from("portfolio_snapshots").select("date, total_value, total_invested").order("date"),
+    /* 7  */ db.from("loans").select("*").eq("member_id", session.id).in("status", ["pending", "approved", "active"]).limit(1).maybeSingle(),
+    /* 8  */ db.from("settings").select("key, value").in("key", ["max_loan_pct", "loan_interest_rate", "required_contribution", "contribution_baseline", "contribution_baseline_date"]),
+    /* 9  */ db.from("contributions").select("amount, date").eq("member_id", session.id).eq("type", "deposit"),
+    /* 10 */ db.from("messages").select("id", { count: "exact", head: true }).eq("recipient_id", session.id).eq("is_read", false),
+    /* 11 */ db.from("announcements").select("id, title, body, pinned, created_at, author:members(name)").order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(5),
+    // Admin-only queries (null for non-admin)
+    /* 12 */ admin ? db.from("investments").select("*").eq("is_active", true) : null,
+    /* 13 */ admin ? db.from("members").select("id, name, email, phone, role, monthly_contribution, is_active, joined_at").eq("is_active", true).order("name") : null,
+    /* 14 */ admin ? db.from("member_snapshots").select("date").order("date", { ascending: false }).limit(100) : null,
+    /* 15 */ admin ? db.from("contributions").select("member_id, amount").eq("type", "deposit") : null,
+    /* 16 */ admin ? db.from("contributions").select("id, amount, type, date, members(name)").order("created_at", { ascending: false }).limit(10) : null,
+    /* 17 */ admin ? db.from("loans").select("id, amount, status, requested_at, members!loans_member_id_fkey(name)").order("requested_at", { ascending: false }).limit(5) : null,
+    /* 18 */ admin ? db.from("fines").select("id, amount, reason, date, members(name)").order("date", { ascending: false }).limit(5) : null,
+  ];
 
-  // Growth metrics
+  const results = await Promise.all(promises);
+
+  // ── Extract member data ───────────────────────────────────────────
+  const member = results[0].data;
+  const valuation = results[1];
+  const clubGains = results[2];
+  const history = results[3];
+  const contributions = results[4].data || [];
+  const fines = results[5].data || [];
+  const clubHistory = results[6].data || [];
+  const activeLoan = results[7].data || null;
+  const allSettings = results[8].data || [];
+  const allDeposits = results[9].data || [];
+  const announcements = results[11].data || [];
+
+  // ── Contribution status (same logic as /api/me) ───────────────────
+  const settingsMap = {};
+  allSettings.forEach((s) => { settingsMap[s.key] = s.value; });
+
   const now = new Date();
+  const requiredAmount = parseFloat(settingsMap.required_contribution) || 0;
+  const baseline = parseFloat(settingsMap.contribution_baseline) || 0;
+  const baselineDate = settingsMap.contribution_baseline_date || "2026-03-31";
+  const bd = new Date(baselineDate);
   const currentYear = now.getFullYear();
-  const safeHistory = history || [];
-  const prevMonth = safeHistory.length >= 1 ? safeHistory[safeHistory.length - 1] : null;
-  const janSnapshot = safeHistory.find((h) => h.date?.startsWith(`${currentYear}-01`)) || (safeHistory.length > 0 ? safeHistory.find((h) => h.date?.startsWith(`${currentYear}-`)) : null);
-  const monthGain = prevMonth ? v.portfolio_value - prevMonth.portfolio_value : null;
-  const monthPct = prevMonth && prevMonth.portfolio_value > 0 ? ((monthGain / prevMonth.portfolio_value) * 100).toFixed(1) : null;
-  const ytdGain = janSnapshot ? v.portfolio_value - janSnapshot.portfolio_value : null;
-  const ytdPct = janSnapshot && janSnapshot.portfolio_value > 0 ? ((ytdGain / janSnapshot.portfolio_value) * 100).toFixed(1) : null;
+  const currentMonth = now.getMonth();
+  const monthsCompleted = Math.max(0, (currentYear - bd.getFullYear()) * 12 + (currentMonth - bd.getMonth()) - 1);
+  const totalExpected = baseline + monthsCompleted * requiredAmount;
 
-  // Club data
-  const clubHist = club_history || [];
-  const clubTotal = v.club_total || 0;
-  const clubSegments = segments.map((s) => ({ ...s, value: s.clubValue, pct: s.pct }));
+  const totalPaid = allDeposits.reduce((s, c) => s + c.amount, 0);
+  const currentMonthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
+  const nextMonthStart = currentMonth === 11
+    ? `${currentYear + 1}-01-01`
+    : `${currentYear}-${String(currentMonth + 2).padStart(2, "0")}-01`;
+  const thisMonthTotal = allDeposits
+    .filter((c) => c.date >= currentMonthStart && c.date < nextMonthStart)
+    .reduce((s, c) => s + c.amount, 0);
 
-  return (
-    <div className="animate-in">
-      {!hideHeader && (
-        <div className="mb-5">
-          <h1 className="text-2xl font-bold">Welcome, {member.name.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")}</h1>
-          <p className="text-sm text-gray-500 mt-1">Your investment overview</p>
-        </div>
-      )}
+  const totalArrears = Math.max(0, totalExpected - totalPaid);
+  const currentMonthRemaining = Math.max(0, requiredAmount - thisMonthTotal);
+  const previousArrears = Math.max(0, totalArrears - currentMonthRemaining);
+  const contributionDue = requiredAmount > 0 && totalArrears > 0;
 
-      {/* Tab Toggle */}
-      <div className="flex gap-1 mb-6 bg-surface-1 border border-surface-3 rounded-xl p-1 w-fit">
-        {[{ id: "personal", label: "My Portfolio", icon: Wallet }, { id: "club", label: "Club Overview", icon: BarChart3 }].map((t) => {
-          const Icon = t.icon;
-          return (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${tab === t.id ? "bg-brand-700 text-white" : "text-gray-400 hover:text-white"}`}>
-              <Icon size={16} />{t.label}
-            </button>
-          );
-        })}
-      </div>
+  // ── Member gains (scale club gains by ownership) ──────────────────
+  const ownershipFraction = valuation?.ownership_pct ? valuation.ownership_pct / 100 : 0;
+  const memberGains = {
+    daily: clubGains.daily ? {
+      gain: Math.round(clubGains.daily.gain * ownershipFraction * 100) / 100,
+      pct: Math.round(clubGains.daily.pct * 100) / 100,
+    } : null,
+    weekly: clubGains.weekly ? {
+      gain: Math.round(clubGains.weekly.gain * ownershipFraction * 100) / 100,
+      pct: Math.round(clubGains.weekly.pct * 100) / 100,
+    } : null,
+  };
 
-      {/* Contribution Status */}
-      {contribution_status && (
-        <div className="card mb-5" style={{
-          borderColor: contribution_status.is_due ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)",
-          background: contribution_status.is_due ? "rgba(127,29,29,0.1)" : "rgba(20,83,45,0.1)",
-        }}>
-          <div className="flex items-center gap-3">
-            {contribution_status.is_due
-              ? <AlertTriangle size={18} className="text-red-400 shrink-0" />
-              : <CheckCircle size={18} className="text-green-400 shrink-0" />
-            }
-            <div className="flex-1">
-              <div className={`text-sm font-semibold ${contribution_status.is_due ? "text-red-400" : "text-green-400"}`}>
-                {contribution_status.is_due ? "Contribution Due" : "Contributions Up to Date"}
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 space-y-1.5 pl-[30px]">
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-400">Fully paid-up member target</span>
-              <span className="font-mono text-white">{fmtUGX(contribution_status.total_expected)}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-400">Your total contributions</span>
-              <span className="font-mono text-white">{fmtUGX(contribution_status.total_paid)}</span>
-            </div>
-            {contribution_status.is_due && (
-              <>
-                <div className="border-t border-white/10 my-1.5" />
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-400 font-semibold">Amount due to be fully paid up</span>
-                  <span className="font-mono text-red-400 font-semibold">{fmtUGX(contribution_status.total_arrears)}</span>
-                </div>
-                {contribution_status.previous_arrears > 0 && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">
-                      Past arrears <span className="text-gray-500">({contribution_status.months_behind} month{contribution_status.months_behind !== 1 ? "s" : ""} missed)</span>
-                    </span>
-                    <span className="font-mono text-red-400">{fmtUGX(contribution_status.previous_arrears)}</span>
-                  </div>
-                )}
-                {contribution_status.current_month_remaining > 0 && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">
-                      This month <span className="text-gray-500">({fmtUGX(contribution_status.paid_this_month)} of {fmtUGX(contribution_status.required)} paid)</span>
-                    </span>
-                    <span className="font-mono text-amber-400">{fmtUGX(contribution_status.current_month_remaining)}</span>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+  // ── Assemble member data payload ──────────────────────────────────
+  const memberData = {
+    member,
+    valuation,
+    history,
+    gains: memberGains,
+    club_gains: {
+      daily: clubGains.daily ? { gain: Math.round(clubGains.daily.gain), pct: Math.round(clubGains.daily.pct * 100) / 100 } : null,
+      weekly: clubGains.weekly ? { gain: Math.round(clubGains.weekly.gain), pct: Math.round(clubGains.weekly.pct * 100) / 100 } : null,
+    },
+    contributions,
+    fines,
+    unpaid_fines: fines.filter((f) => !f.is_paid),
+    club_history: clubHistory,
+    active_loan: activeLoan,
+    contribution_status: {
+      required: requiredAmount,
+      total_expected: totalExpected + requiredAmount,
+      total_paid: totalPaid,
+      paid_this_month: thisMonthTotal,
+      is_due: contributionDue,
+      total_arrears: totalArrears,
+      current_month_remaining: currentMonthRemaining,
+      previous_arrears: previousArrears,
+      months_behind: requiredAmount > 0 ? Math.floor(previousArrears / requiredAmount) : 0,
+    },
+    announcements,
+  };
 
-      {/* Announcements */}
-      {announcements?.length > 0 && tab === "personal" && (
-        <div className="space-y-2 mb-5">
-          {announcements.slice(0, 3).map((a) => (
-            <div key={a.id} className="card py-3" style={a.pinned ? { borderColor: "rgba(59,130,246,0.2)" } : {}}>
-              <div className="flex items-start gap-2">
-                <div className="w-6 h-6 rounded bg-brand-700/20 flex items-center justify-center shrink-0 mt-0.5"><MessageSquare size={12} className="text-brand-500" /></div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold">{a.title}</span>
-                    {a.pinned && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-900/20 text-blue-400 font-semibold">Pinned</span>}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">{a.body}</div>
-                  <div className="text-[10px] text-gray-600 mt-1">{a.author?.name?.split(" ").map((w) => w[0] + w.slice(1).toLowerCase()).join(" ")} · {new Date(a.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+  // ── Admin data ────────────────────────────────────────────────────
+  let adminData = null;
+  if (admin) {
+    const investments = results[12]?.data || [];
+    const allMembers = results[13]?.data || [];
+    const allSnapDates = results[14]?.data || [];
+    const adminAllDeposits = results[15]?.data || [];
+    const actContribs = results[16]?.data || [];
+    const actLoans = results[17]?.data || [];
+    const actFines = results[18]?.data || [];
 
-      {/* ═══ PERSONAL TAB ═══ */}
-      {tab === "personal" && (
-        <div>
-          {/* Hero */}
-          <div className="card mb-5" style={{ borderColor: "rgba(15,118,110,0.3)" }}>
-            <div className="flex justify-between items-start flex-wrap gap-2">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Your Portfolio Value</div>
-                <div className="text-3xl font-bold font-mono">{fmtUGX(v.portfolio_value)}</div>
-              </div>
-              <div className="text-right">
-                <div className={`flex items-center gap-1 font-semibold text-sm ${up ? "text-green-400" : "text-red-400"}`}>
-                  {up ? <TrendingUp size={16} /> : <TrendingDown size={16} />} {up ? "+" : ""}{fmtUGX(v.total_gain)}
-                </div>
-                <div className={`text-xs font-bold ${up ? "text-green-400" : "text-red-400"}`}>{up ? "+" : ""}{v.return_pct}% all-time</div>
-              </div>
-            </div>
-            <div className="flex gap-4 mt-3 text-xs text-gray-500">
-              <span>Monthly: <span className="font-mono text-white">{fmtUGX(member.monthly_contribution)}</span></span>
-              <span>Ownership: <span className="font-mono text-white">{v.ownership_pct}%</span></span>
-            </div>
-          </div>
+    // ── Portfolio summary ──
+    const portfolioSummary = {};
+    let portfolioTotalValue = 0;
+    let portfolioTotalCost = 0;
+    investments.forEach((inv) => {
+      if (!portfolioSummary[inv.asset_class]) portfolioSummary[inv.asset_class] = { value: 0, cost: 0 };
+      portfolioSummary[inv.asset_class].value += inv.current_value || 0;
+      portfolioSummary[inv.asset_class].cost += inv.cost_basis || 0;
+      portfolioTotalValue += inv.current_value || 0;
+      portfolioTotalCost += inv.cost_basis || 0;
+    });
+    for (const cls in portfolioSummary) {
+      portfolioSummary[cls].percentage = portfolioTotalValue > 0 ? (portfolioSummary[cls].value / portfolioTotalValue) * 100 : 0;
+    }
 
-          {/* KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            <StatCard label="Total Invested" value={fmtUGX(v.total_invested)} />
-            <StatCard label="Today" value={gains?.daily ? `${gains.daily.gain >= 0 ? "+" : ""}${fmtShort(gains.daily.gain)}` : "—"} sub={gains?.daily ? `${gains.daily.pct >= 0 ? "+" : ""}${gains.daily.pct}%` : "No price data"} color={!gains?.daily ? "#6B7280" : gains.daily.gain >= 0 ? "#22C55E" : "#EF4444"} />
-            <StatCard label="This Week" value={gains?.weekly ? `${gains.weekly.gain >= 0 ? "+" : ""}${fmtShort(gains.weekly.gain)}` : "—"} sub={gains?.weekly ? `${gains.weekly.pct >= 0 ? "+" : ""}${gains.weekly.pct}%` : "No price data"} color={!gains?.weekly ? "#6B7280" : gains.weekly.gain >= 0 ? "#22C55E" : "#EF4444"} />
-            <StatCard label="This Month" value={monthGain !== null ? `${monthGain >= 0 ? "+" : ""}${fmtShort(monthGain)}` : "—"} sub={monthPct !== null ? `${monthPct >= 0 ? "+" : ""}${monthPct}%` : "No prior month"} color={monthGain === null ? "#6B7280" : monthGain >= 0 ? "#22C55E" : "#EF4444"} />
-          </div>
+    // ── Members with snapshots + real-time arrears ──
+    let latestDate = null;
+    for (const row of allSnapDates) {
+      const d = new Date(row.date);
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      if (d.getDate() >= lastDay) { latestDate = row.date; break; }
+    }
+    if (!latestDate && allSnapDates.length) latestDate = allSnapDates[0].date;
 
-          {/* Chart + Allocation */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
-            <div className="lg:col-span-3 card">
-              <div className="flex justify-between items-center mb-3">
-                <div className="text-sm font-semibold">Portfolio Over Time</div>
-                {safeHistory.length > 0 && <div className="text-[11px] text-gray-500">{new Date(safeHistory[0].date).toLocaleDateString("en-GB", { month: "short", year: "numeric" })} — Present</div>}
-              </div>
-              {safeHistory.length > 1 ? (
-                <>
-                  <Sparkline data={safeHistory.map((h) => h.portfolio_value)} width={500} height={120} color="#14B8A6" />
-                  <div className="flex justify-between text-[10px] text-gray-600 mt-2 px-1">
-                    {safeHistory.filter((_, i) => i === 0 || i === safeHistory.length - 1 || i === Math.floor(safeHistory.length / 2)).map((h) => (
-                      <span key={h.date}>{new Date(h.date).toLocaleDateString("en-GB", { month: "short", year: "2-digit" })}</span>
-                    ))}
-                  </div>
-                </>
-              ) : <div className="text-gray-500 text-sm py-8 text-center">Chart appears after the second monthly valuation</div>}
-            </div>
-            <div className="lg:col-span-2 card">
-              <div className="text-sm font-semibold mb-3">Your Allocation</div>
-              <div className="flex items-center gap-4">
-                <DonutChart segments={segments} size={100} />
-                <div className="flex-1 space-y-1.5">
-                  {segments.map((s) => (
-                    <div key={s.label} className="flex items-center gap-2 text-xs">
-                      <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: s.color }} />
-                      <span className="text-gray-400 flex-1 truncate">{s.label.replace(" (UAP)", "")}</span>
-                      <span className="font-mono font-semibold">{s.pct}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+    let snapshotMap = {};
+    if (latestDate) {
+      // One dependent query — snapshots for the determined date
+      const { data: snapshots } = await db.from("member_snapshots").select("*").eq("date", latestDate);
+      (snapshots || []).forEach((s) => { snapshotMap[s.member_id] = s; });
+    }
 
-          {/* Recent contribution receipt */}
-          {contributions?.length > 0 && (() => {
-            const latest = contributions[0];
-            const daysAgo = Math.floor((Date.now() - new Date(latest.date).getTime()) / (86400000));
-            if (daysAgo > 7) return null;
-            return (
-              <div className="card mb-4 flex items-center gap-3" style={{ borderColor: "rgba(34,197,94,0.3)", background: "rgba(22,101,52,0.08)" }}>
-                <div className="w-9 h-9 rounded-lg bg-green-900/30 flex items-center justify-center shrink-0"><ArrowDown size={18} className="text-green-400" /></div>
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-green-400">Contribution Recorded</div>
-                  <div className="text-xs text-gray-400">{fmtUGX(latest.amount)} {latest.type} on {fmtDate(latest.date)}{latest.description ? ` — ${latest.description}` : ""}</div>
-                </div>
-                <span className="px-2 py-0.5 rounded bg-green-900/20 text-green-400 text-[10px] font-semibold shrink-0">{daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo}d ago`}</span>
-              </div>
-            );
-          })()}
+    // Arrears from all deposits
+    const depositsByMember = {};
+    for (const d of adminAllDeposits) {
+      depositsByMember[d.member_id] = (depositsByMember[d.member_id] || 0) + d.amount;
+    }
 
-          {/* Holdings + Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="space-y-4">
-              {/* Holdings */}
-              <div className="card">
-                <div className="text-sm font-semibold mb-3">Your Holdings</div>
-                {segments.map((s) => (
-                  <div key={s.label} className="flex justify-between items-center py-2 border-b border-surface-3 last:border-0">
-                    <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded" style={{ background: s.color }} /><span className="text-sm">{s.label.replace(" (UAP)", "")}</span></div>
-                    <div className="text-sm font-mono font-semibold">{fmtUGX(s.value)}</div>
-                  </div>
-                ))}
-                <div className="flex justify-between pt-2 text-sm font-bold"><span>Total</span><span className="font-mono">{fmtUGX(v.portfolio_value)}</span></div>
-              </div>
+    const adminMembers = allMembers.map((m) => {
+      const snapshot = snapshotMap[m.id] || null;
+      const mTotalPaid = depositsByMember[m.id] || 0;
+      const realTimeArrears = Math.max(0, totalExpected - mTotalPaid);
+      return {
+        ...m,
+        snapshot: snapshot ? { ...snapshot, contribution_arrears: Math.round(realTimeArrears * 100) / 100 } : null,
+        snapshot_date: latestDate || null,
+      };
+    });
 
-              {/* Active Loan */}
-              {active_loan && (() => {
-                const totalDue = active_loan.total_due || active_loan.amount;
-                const remaining = Math.max(0, totalDue - (active_loan.amount_paid || 0));
-                const paidPct = totalDue > 0 ? Math.min(100, ((active_loan.amount_paid || 0) / totalDue) * 100) : 0;
-                const dueDate = active_loan.activated_at ? new Date(new Date(active_loan.activated_at).setMonth(new Date(active_loan.activated_at).getMonth() + 3)) : null;
-                const overdue = active_loan.status === "active" && dueDate && new Date() > dueDate;
-                const borderColor = overdue ? "rgba(239,68,68,0.4)" : active_loan.status === "active" ? "rgba(59,130,246,0.3)" : "rgba(217,119,6,0.3)";
-                const bgColor = overdue ? "rgba(127,29,29,0.08)" : active_loan.status === "active" ? "rgba(30,58,138,0.08)" : "rgba(120,53,15,0.08)";
+    // ── Activity feed ──
+    const activityItems = [];
+    actContribs.forEach((c) => activityItems.push({
+      type: "contribution",
+      text: `${c.members?.name || "Member"} — ${c.type} of ${Math.round(c.amount).toLocaleString()}`,
+      date: c.date,
+      icon: "dollar",
+    }));
+    actLoans.forEach((l) => activityItems.push({
+      type: "loan",
+      text: `${l.members?.name || "Member"} — loan ${l.status} (${Math.round(l.amount).toLocaleString()})`,
+      date: l.requested_at,
+      icon: "landmark",
+    }));
+    actFines.forEach((f) => activityItems.push({
+      type: "fine",
+      text: `${f.members?.name || "Member"} — fined for ${f.reason}`,
+      date: f.date,
+      icon: "alert",
+    }));
+    activityItems.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-                return (
-                  <div className="card" style={{ borderColor, background: bgColor }}>
-                    {overdue && (
-                      <div className="bg-red-900/20 border border-red-800/30 text-red-400 text-xs rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
-                        <AlertTriangle size={14} /> Loan overdue — all contributions go to recovery
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: overdue ? "#F87171" : active_loan.status === "active" ? "#60A5FA" : "#FBBF24" }}>
-                        <Landmark size={16} />
-                        {active_loan.status === "active" ? "Active Loan" : "Loan Request"}
-                      </div>
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${overdue ? "bg-red-900/20 text-red-400" : active_loan.status === "active" ? "bg-blue-900/20 text-blue-400" : "bg-amber-900/20 text-amber-400"}`}>
-                        {overdue ? "Overdue" : active_loan.status === "pending" ? (active_loan.approved_by_1 ? "Approved (1/2)" : "Pending") : active_loan.status === "active" ? "Active" : "Approved"}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                      <div><span className="text-xs text-gray-500">Loan Amount</span><div className="font-mono font-semibold">{fmtUGX(active_loan.amount)}</div></div>
-                      <div><span className="text-xs text-gray-500">Total Due</span><div className="font-mono font-semibold">{fmtUGX(totalDue)}</div></div>
-                      <div><span className="text-xs text-gray-500">Remaining</span><div className={`font-mono font-semibold ${overdue ? "text-red-400" : "text-amber-400"}`}>{fmtUGX(remaining)}</div></div>
-                      {dueDate && <div><span className="text-xs text-gray-500">Due By</span><div className={`font-mono font-semibold ${overdue ? "text-red-400" : ""}`}>{fmtDate(dueDate)}</div></div>}
-                    </div>
-
-                    {active_loan.status === "active" && totalDue > 0 && (
-                      <div className="mb-3">
-                        <div className="flex justify-between text-[11px] text-gray-500 mb-1">
-                          <span>Repaid</span>
-                          <span>{Math.round(paidPct)}%</span>
-                        </div>
-                        <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all ${overdue ? "bg-red-500" : "bg-blue-500"}`} style={{ width: `${paidPct}%` }} />
-                        </div>
-                      </div>
-                    )}
-
-                    {active_loan.status === "pending" && !active_loan.activated_at && (
-                      <div className="text-xs text-amber-400 mb-2">Awaiting admin approval{active_loan.approved_by_1 ? " (1 of 2 approved)" : ""}</div>
-                    )}
-                    <a href="/loans" className="text-xs text-brand-500 hover:text-brand-400 inline-block">View details &rarr;</a>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="space-y-4">
-              {/* Fines */}
-              {unpaid_fines?.length > 0 && (
-                <div className="card" style={{ borderColor: "rgba(217,119,6,0.3)", background: "rgba(120,53,15,0.1)" }}>
-                  <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold mb-2"><AlertTriangle size={16} /> Outstanding Fines</div>
-                  {unpaid_fines.map((f) => (
-                    <div key={f.id} className="flex justify-between text-sm py-1.5"><span className="text-gray-400">{f.reason}</span><span className="font-mono text-amber-400">{fmtUGX(f.amount)}</span></div>
-                  ))}
-                </div>
-              )}
-
-              {/* Recent Activity */}
-              <div className="card">
-                <div className="text-sm font-semibold mb-3">Recent Activity</div>
-                {!contributions?.length ? <div className="text-gray-500 text-sm py-4 text-center">No contributions yet</div> : (
-                  <div className="divide-y divide-surface-3">
-                    {contributions.slice(0, 8).map((c) => (
-                      <div key={c.id} className="flex items-center justify-between py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${c.type === "deposit" ? "bg-green-900/30 text-green-400" : "bg-red-900/30 text-red-400"}`}>
-                            {c.type === "deposit" ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
-                          </div>
-                          <div><div className="text-sm capitalize">{c.type}</div><div className="text-[11px] text-gray-500">{new Date(c.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div></div>
-                        </div>
-                        <div className={`text-sm font-mono font-semibold ${c.type === "deposit" ? "text-green-400" : "text-red-400"}`}>
-                          {c.type === "deposit" ? "+" : "-"}{fmtShort(c.amount)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Club Activity Feed */}
-      {tab === "personal" && clubActivity.length > 0 && (
-        <div className="card mt-5">
-          <div className="text-sm font-semibold mb-3">Club Activity</div>
-          <div className="divide-y divide-surface-3">
-            {clubActivity.slice(0, 8).map((item, i) => (
-              <div key={i} className="flex items-center gap-3 py-2.5">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${item.icon === "dollar" ? "bg-green-900/30" : item.icon === "landmark" ? "bg-blue-900/30" : "bg-amber-900/30"}`}>
-                  {item.icon === "dollar" && <DollarSign size={14} className="text-green-400" />}
-                  {item.icon === "landmark" && <Landmark size={14} className="text-blue-400" />}
-                  {item.icon === "alert" && <AlertTriangle size={14} className="text-amber-400" />}
-                </div>
-                <div className="flex-1 min-w-0 text-xs text-gray-400 truncate">{titleCase(item.text)}</div>
-                <div className="text-[10px] text-gray-600 shrink-0">{fmtDate(item.date)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ CLUB OVERVIEW TAB ═══ */}
-      {tab === "club" && (
-        <div>
-          {/* Club Hero */}
-          <div className="card mb-5" style={{ borderColor: "rgba(59,130,246,0.2)" }}>
-            <div className="text-xs text-gray-500 mb-1">Club Portfolio Value</div>
-            <div className="text-3xl font-bold font-mono">{fmtUGX(clubTotal)}</div>
-            <div className="text-xs text-gray-500 mt-1">Your share: <span className="font-mono text-white">{v.ownership_pct}%</span> = <span className="font-mono text-brand-500">{fmtUGX(v.portfolio_value)}</span></div>
-          </div>
-
-          {/* Club Daily/Weekly */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-            <StatCard label="Club Today" value={club_gains?.daily ? `${club_gains.daily.gain >= 0 ? "+" : ""}${fmtShort(club_gains.daily.gain)}` : "—"} sub={club_gains?.daily ? `${club_gains.daily.pct >= 0 ? "+" : ""}${club_gains.daily.pct}%` : "No price data"} color={!club_gains?.daily ? "#6B7280" : club_gains.daily.gain >= 0 ? "#22C55E" : "#EF4444"} />
-            <StatCard label="Club This Week" value={club_gains?.weekly ? `${club_gains.weekly.gain >= 0 ? "+" : ""}${fmtShort(club_gains.weekly.gain)}` : "—"} sub={club_gains?.weekly ? `${club_gains.weekly.pct >= 0 ? "+" : ""}${club_gains.weekly.pct}%` : "No price data"} color={!club_gains?.weekly ? "#6B7280" : club_gains.weekly.gain >= 0 ? "#22C55E" : "#EF4444"} />
-            <StatCard label="Club All-Time" value={fmtUGX(clubTotal - (clubHist[0]?.total_invested || 0))} sub="Since inception" color="#14B8A6" />
-          </div>
-
-          {/* Club Chart + Allocation */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
-            <div className="lg:col-span-3 card">
-              <div className="text-sm font-semibold mb-3">Club Growth</div>
-              {clubHist.length > 1 ? (
-                <>
-                  <Sparkline data={clubHist.map((h) => h.total_value)} width={500} height={120} />
-                  <div className="flex justify-between text-[10px] text-gray-600 mt-2 px-1">
-                    {clubHist.filter((_, i) => i === 0 || i === clubHist.length - 1 || i === Math.floor(clubHist.length / 2)).map((h) => (
-                      <span key={h.date}>{new Date(h.date).toLocaleDateString("en-GB", { month: "short", year: "2-digit" })}</span>
-                    ))}
-                  </div>
-                </>
-              ) : <div className="text-gray-500 text-sm py-8 text-center">No club history yet</div>}
-            </div>
-            <div className="lg:col-span-2 card">
-              <div className="text-sm font-semibold mb-3">Club Allocation</div>
-              <div className="flex items-center gap-4">
-                <DonutChart segments={clubSegments} size={100} />
-                <div className="flex-1 space-y-1.5">
-                  {clubSegments.map((s) => (
-                    <div key={s.label} className="flex items-center gap-2 text-xs">
-                      <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: s.color }} />
-                      <span className="text-gray-400 flex-1 truncate">{s.label.replace(" (UAP)", "")}</span>
-                      <span className="font-mono font-semibold">{s.pct}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Club Holdings */}
-          <div className="card">
-            <div className="text-sm font-semibold mb-3">Club Holdings</div>
-            {clubSegments.map((s) => (
-              <div key={s.label} className="flex justify-between items-center py-2 border-b border-surface-3 last:border-0">
-                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded" style={{ background: s.color }} /><span className="text-sm">{s.label.replace(" (UAP)", "")}</span></div>
-                <div className="text-right">
-                  <div className="text-sm font-mono font-semibold">{fmtUGX(s.value)}</div>
-                  <div className="text-[11px] text-gray-500">Your share: {fmtShort(s.value * (v.ownership_pct / 100))}</div>
-                </div>
-              </div>
-            ))}
-            <div className="flex justify-between pt-2 text-sm font-bold"><span>Total</span><span className="font-mono">{fmtUGX(clubTotal)}</span></div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AdminDashboard() {
-  const [members, setMembers] = useState([]);
-  const [portfolio, setPortfolio] = useState(null);
-  const [activity, setActivity] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/members").then((r) => r.json()),
-      fetch("/api/portfolio").then((r) => r.json()),
-      fetch("/api/activity").then((r) => r.json()),
-    ]).then(([m, p, a]) => {
-      setMembers(Array.isArray(m) ? m : []);
-      setPortfolio(p);
-      setActivity(Array.isArray(a) ? a : []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
-
-  if (loading) return <SkeletonPage cards={3} rows={5} />;
-
-  const totalValue = portfolio?.totalValue || 0;
-  const history = portfolio?.history || [];
-  const summary = portfolio?.summary || {};
-  const clubGains = portfolio?.gains || {};
-  const totalInvested = members.reduce((s, m) => s + (m.snapshot?.total_invested || 0), 0);
-  const totalGain = totalValue - totalInvested;
-  const returnPct = totalInvested > 0 ? ((totalGain / totalInvested) * 100).toFixed(1) : 0;
-  const arrearsMembers = members.filter((m) => (m.snapshot?.contribution_arrears || 0) > 0);
-  const totalArrears = arrearsMembers.reduce((s, m) => s + m.snapshot.contribution_arrears, 0);
-
-  const segments = Object.entries(summary).map(([cls, data]) => ({
-    label: ASSET_CLASS_LABELS[cls] || cls, pct: data.percentage || 0, color: ASSET_CLASS_COLORS[cls] || "#666", value: data.value,
-  })).filter((s) => s.pct > 0);
-
-  // Monthly contribution reminder
-  const now = new Date();
-  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const latestSnapshotDate = members[0]?.snapshot_date;
-  const snapshotMonth = latestSnapshotDate ? latestSnapshotDate.slice(0, 7) : null;
-  const contributionsDue = !snapshotMonth || snapshotMonth < currentMonthStr;
-
-  return (
-    <div className="animate-in">
-      <div className="mb-5"><h1 className="text-2xl font-bold">Club Dashboard</h1><p className="text-sm text-gray-500 mt-1">{CLUB_SHORT} Investment Club overview</p></div>
-
-      {contributionsDue && (
-        <div className="card mb-5 flex items-center gap-3" style={{ borderColor: "rgba(217,119,6,0.3)", background: "rgba(120,53,15,0.1)" }}>
-          <AlertTriangle size={18} className="text-amber-400 shrink-0" />
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-amber-400">Monthly contributions due</div>
-            <div className="text-xs text-gray-400">Record member contributions for {now.toLocaleDateString("en-GB", { month: "long", year: "numeric" })} and run a valuation.</div>
-          </div>
-          <a href="/contributions" className="bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap">Record Now</a>
-        </div>
-      )}
-
-      {/* Members behind on contributions */}
-      {(() => {
-        const behind = members.filter((m) => (m.snapshot?.contribution_arrears || 0) > 0)
-          .sort((a, b) => b.snapshot.contribution_arrears - a.snapshot.contribution_arrears);
-        if (behind.length === 0) return null;
-        return (
-          <div className="card mb-5 p-0 overflow-hidden" style={{ borderColor: "rgba(239,68,68,0.2)" }}>
-            <div className="px-4 py-3 border-b border-surface-3 flex justify-between items-center">
-              <div className="text-sm font-semibold text-red-400">{behind.length} member{behind.length > 1 ? "s" : ""} behind on contributions</div>
-              <a href="/contributions" className="text-xs text-brand-500 hover:text-brand-400">Record Now</a>
-            </div>
-            <div className="flex flex-wrap gap-2 px-4 py-3">
-              {behind.map((m) => (
-                <span key={m.id} className="px-2.5 py-1 rounded-lg bg-red-900/10 border border-red-800/20 text-xs text-red-400">
-                  {titleCase(m.name)} — {fmtUGX(m.snapshot.contribution_arrears)}
-                </span>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2 mb-5">
-        <a href="/contributions" className="bg-surface-1 hover:bg-surface-2 border border-surface-3 text-sm text-gray-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"><DollarSign size={14} className="text-green-400" />Record Contributions</a>
-        <a href="/admin" className="bg-surface-1 hover:bg-surface-2 border border-surface-3 text-sm text-gray-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"><BarChart3 size={14} className="text-brand-500" />Run Valuation</a>
-        <a href="/admin" className="bg-surface-1 hover:bg-surface-2 border border-surface-3 text-sm text-gray-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2"><PieChart size={14} className="text-purple-400" />Manage Investments</a>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-        <StatCard label="Portfolio Value" value={fmtUGX(totalValue)} sub={`${returnPct >= 0 ? "+" : ""}${returnPct}% all-time`} color="#22C55E" />
-        <StatCard label="Total Invested" value={fmtUGX(totalInvested)} sub={`${members.length} members`} color="#3B82F6" />
-        <StatCard label="Arrears" value={fmtUGX(totalArrears)} sub={`${arrearsMembers.length} members behind`} color="#EF4444" />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <StatCard label="Today" value={clubGains.daily ? `${clubGains.daily.gain >= 0 ? "+" : ""}${fmtShort(clubGains.daily.gain)}` : "—"} sub={clubGains.daily ? `${clubGains.daily.pct >= 0 ? "+" : ""}${clubGains.daily.pct}%` : "No price data"} color={!clubGains.daily ? "#6B7280" : clubGains.daily.gain >= 0 ? "#22C55E" : "#EF4444"} />
-        <StatCard label="This Week" value={clubGains.weekly ? `${clubGains.weekly.gain >= 0 ? "+" : ""}${fmtShort(clubGains.weekly.gain)}` : "—"} sub={clubGains.weekly ? `${clubGains.weekly.pct >= 0 ? "+" : ""}${clubGains.weekly.pct}%` : "No price data"} color={!clubGains.weekly ? "#6B7280" : clubGains.weekly.gain >= 0 ? "#22C55E" : "#EF4444"} />
-        <StatCard label="All-Time Gain" value={fmtUGX(totalGain)} sub="Since inception" color={totalGain >= 0 ? "#14B8A6" : "#EF4444"} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5">
-        <div className="lg:col-span-3 card">
-          <div className="text-sm font-semibold mb-3">Portfolio History</div>
-          {history.length > 1 ? <Sparkline data={history.map((h) => h.total_value)} width={600} height={120} /> : <div className="text-gray-500 text-sm py-8 text-center">No history yet</div>}
-        </div>
-        <div className="lg:col-span-2 card">
-          <div className="text-sm font-semibold mb-3">Asset Allocation</div>
-          <div className="flex items-center gap-5">
-            <DonutChart segments={segments} size={110} />
-            <div className="flex-1 space-y-1.5">{segments.map((s) => (
-              <div key={s.label} className="flex items-center gap-2 text-xs"><span className="w-2 h-2 rounded-sm shrink-0" style={{ background: s.color }} /><span className="text-gray-400 flex-1 truncate">{s.label.replace(" (UAP)", "")}</span><span className="font-mono font-semibold">{s.pct.toFixed(1)}%</span></div>
-            ))}</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card p-0 overflow-hidden">
-        <div className="px-5 py-3 border-b border-surface-3 flex justify-between items-center"><span className="text-sm font-semibold">All Members</span><span className="text-xs text-gray-500">{members.length} members</span></div>
-        <div className="overflow-x-auto">
-          {[...members].sort((a, b) => (b.snapshot?.portfolio_value || 0) - (a.snapshot?.portfolio_value || 0)).map((m) => {
-            const s = m.snapshot;
-            const ret = s && s.total_invested > 0 ? (((s.portfolio_value - s.total_invested) / s.total_invested) * 100).toFixed(1) : 0;
-            return (
-              <div key={m.id} className="grid grid-cols-3 sm:grid-cols-5 items-center px-4 sm:px-5 py-3 border-b border-surface-3 hover:bg-surface-2 transition-colors text-[13px]">
-                <div className="flex items-center gap-2.5"><Avatar name={m.name} size={30} /><div><div className="font-medium truncate">{titleCase(m.name)}</div><div className="text-[11px] text-gray-500 hidden sm:block">{m.monthly_contribution > 0 ? `${fmtShort(m.monthly_contribution)}/mo` : ""}</div></div></div>
-                <div className="text-right font-mono font-semibold">{fmtShort(s?.portfolio_value || 0)}</div>
-                <div className={`text-right font-semibold ${ret >= 0 ? "text-green-400" : "text-red-400"}`}>{ret >= 0 ? "+" : ""}{ret}%</div>
-                <div className="hidden sm:block text-right font-mono">{fmtShort(s?.total_invested || 0)}</div>
-                <div className="hidden sm:block text-right"><span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${(s?.contribution_arrears || 0) > 0 ? "bg-red-900/20 text-red-400" : "bg-green-900/20 text-green-400"}`}>{(s?.contribution_arrears || 0) > 0 ? `−${fmtShort(s.contribution_arrears)}` : "Current"}</span></div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Activity Feed */}
-      {activity.length > 0 && (
-        <div className="card mt-5">
-          <div className="text-sm font-semibold mb-3">Recent Activity</div>
-          <div className="divide-y divide-surface-3">
-            {activity.slice(0, 10).map((item, i) => (
-              <div key={i} className="flex items-center gap-3 py-2.5">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                  item.icon === "dollar" ? "bg-green-900/30" : item.icon === "landmark" ? "bg-blue-900/30" : "bg-amber-900/30"
-                }`}>
-                  {item.icon === "dollar" && <DollarSign size={14} className="text-green-400" />}
-                  {item.icon === "landmark" && <Landmark size={14} className="text-blue-400" />}
-                  {item.icon === "alert" && <AlertTriangle size={14} className="text-amber-400" />}
-                </div>
-                <div className="flex-1 min-w-0 text-xs text-gray-400 truncate">{titleCase(item.text)}</div>
-                <div className="text-[10px] text-gray-600 shrink-0">{fmtDate(item.date)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function DashboardPage() {
-  const user = useUser();
-  if (!user) return null;
-
-  if (user.role === "admin") {
-    return (
-      <>
-        <AdminNotifications />
-        <AdminDashboard />
-        <div className="mt-8 pt-8 border-t border-surface-3">
-          <div className="mb-4">
-            <h2 className="text-lg font-bold text-gray-400">My Portfolio</h2>
-            <p className="text-xs text-gray-500">Your personal investment overview</p>
-          </div>
-          <MemberDashboard hideHeader />
-        </div>
-      </>
-    );
+    adminData = {
+      members: adminMembers,
+      portfolio: {
+        totalValue: portfolioTotalValue,
+        summary: portfolioSummary,
+        history: clubHistory, // reuse the same portfolio_snapshots
+        gains: {
+          daily: clubGains.daily ? { gain: Math.round(clubGains.daily.gain), pct: Math.round(clubGains.daily.pct * 100) / 100 } : null,
+          weekly: clubGains.weekly ? { gain: Math.round(clubGains.weekly.gain), pct: Math.round(clubGains.weekly.pct * 100) / 100 } : null,
+        },
+      },
+      activity: activityItems.slice(0, 15),
+    };
   }
 
-  return <MemberDashboard />;
+  // ── Serialize user for client (only safe fields) ──────────────────
+  const user = { id: session.id, name: session.name, email: session.email, role: session.role };
+
+  return <DashboardClient user={user} memberData={memberData} adminData={adminData} />;
 }
